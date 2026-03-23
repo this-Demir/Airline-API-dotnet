@@ -5,12 +5,42 @@ using AirlineSystem.Domain.Entities;
 
 namespace AirlineSystem.Application.Services;
 
+/// <summary>
+/// Implements ticket purchasing (FR-05) and admin passenger-manifest retrieval (FR-07).
+/// </summary>
 public class TicketService : ITicketService
 {
     private readonly IUnitOfWork _uow;
 
     public TicketService(IUnitOfWork uow) => _uow = uow;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>PRE-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Caller must be an authenticated <c>Customer</c>; <paramref name="userId"/>
+    ///   is extracted from a valid JWT by the API layer (FR-05.05).</item>
+    ///   <item>The flight identified by <c>FlightNumber + Date</c> must exist.</item>
+    ///   <item><c>PassengerNames</c> must contain at least one name.</item>
+    /// </list>
+    /// <b>POST-CONDITIONS (on success):</b>
+    /// <list type="bullet">
+    ///   <item>A single <c>Booking</c> entity is created, grouping all passengers under
+    ///   one PNR code.</item>
+    ///   <item>Each <c>Passenger</c> entity has BOTH <c>BookingId</c> AND <c>FlightId</c>
+    ///   explicitly populated (intentional denormalization for fast manifest queries).</item>
+    ///   <item><c>Flight.AvailableCapacity</c> is decremented by <c>PassengerNames.Count</c>.</item>
+    ///   <item>All mutations are committed atomically in a single <c>SaveChangesAsync</c> call.</item>
+    /// </list>
+    /// <b>BUSINESS RULES:</b>
+    /// <list type="bullet">
+    ///   <item>If <c>AvailableCapacity &lt; PassengerNames.Count</c>, returns
+    ///   <c>Status = "SoldOut"</c> with no PNR and <b>no state mutation</b> (FR-05.04).</item>
+    ///   <item>PNR codes are generated as the first 6 uppercase characters of a new GUID
+    ///   in <c>"N"</c> format — probabilistically unique, not cryptographically guaranteed.</item>
+    ///   <item>Round-trip bookings require two separate calls to this method, one per leg.</item>
+    /// </list>
+    /// </remarks>
     public async Task<TicketResponseDto> BuyTicketAsync(BuyTicketRequestDto request, Guid userId)
     {
         var flight = await _uow.Flights.GetByFlightNumberAndDateAsync(request.FlightNumber, request.Date)
@@ -50,6 +80,17 @@ public class TicketService : ITicketService
         return new TicketResponseDto { Status = "Confirmed", PnrCode = booking.PnrCode };
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>PRE-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Caller must be an authenticated <c>Admin</c> (enforced at the API layer).</item>
+    /// </list>
+    /// <b>POST-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>No state is mutated; this is a read-only operation.</item>
+    /// </list>
+    /// </remarks>
     public async Task<PaginatedResultDto<PassengerDto>> GetPassengerListAsync(
         string flightNumber, DateTime date, int pageNumber)
     {

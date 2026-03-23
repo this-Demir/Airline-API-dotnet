@@ -7,12 +7,43 @@ using CsvHelper.Configuration;
 
 namespace AirlineSystem.Application.Services;
 
+/// <summary>
+/// Implements flight inventory management (FR-02, FR-03) and public flight search (FR-04).
+/// Admin-scoped methods are secured at the API layer via <c>[Authorize(Roles = "Admin")]</c>.
+/// </summary>
 public class FlightService : IFlightService
 {
     private readonly IUnitOfWork _uow;
 
     public FlightService(IUnitOfWork uow) => _uow = uow;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>PRE-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Caller must be an authenticated <c>Admin</c> (FR-03.04).</item>
+    ///   <item><paramref name="csvStream"/> must be a readable, UTF-8 encoded CSV stream
+    ///   with a header row whose column names case-insensitively match <see cref="FlightUploadDto"/>
+    ///   property names.</item>
+    /// </list>
+    /// <b>POST-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Only rows that pass all validation checks are persisted.</item>
+    ///   <item>All valid rows are committed in a single <c>SaveChangesAsync</c> call (atomic batch).</item>
+    ///   <item>Rows that fail validation are skipped; their errors are returned to the caller.</item>
+    /// </list>
+    /// <b>BUSINESS RULES (per row):</b>
+    /// <list type="bullet">
+    ///   <item><c>(ArrivalDate - DepartureDate).TotalMinutes</c> must equal
+    ///   <c>DurationMinutes</c> within a ±1 minute tolerance (confirmed architectural decision).</item>
+    ///   <item>A flight with the same <c>(FlightNumber, DepartureDate)</c> must not already
+    ///   exist in the database (FR-03.02 duplicate prevention).</item>
+    ///   <item>Both <c>OriginAirportCode</c> and <c>DestinationAirportCode</c> must resolve
+    ///   to existing <see cref="Airport"/> records.</item>
+    ///   <item><c>AvailableCapacity</c> is initialised equal to <c>TotalCapacity</c>
+    ///   on creation.</item>
+    /// </list>
+    /// </remarks>
     public async Task<(int SuccessCount, List<string> Errors)> UploadFlightsFromCsvAsync(Stream csvStream)
     {
         var errors = new List<string>();
@@ -92,6 +123,21 @@ public class FlightService : IFlightService
         return (successCount, errors);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>PRE-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>No authentication required (FR-04.06).</item>
+    ///   <item><c>NumberOfPeople</c> must be &gt;= 1.</item>
+    ///   <item><c>DepartureTo</c> must be &gt;= <c>DepartureFrom</c>.</item>
+    /// </list>
+    /// <b>POST-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Only flights where <c>AvailableCapacity &gt;= NumberOfPeople</c> are returned (FR-04.03).</item>
+    ///   <item>Results are paginated with a fixed page size of 10 (FR-04.05).</item>
+    ///   <item>No state is mutated.</item>
+    /// </list>
+    /// </remarks>
     public async Task<PaginatedResultDto<FlightDto>> SearchFlightsAsync(FlightSearchRequestDto request)
     {
         var (flights, totalCount) = await _uow.Flights.SearchFlightsAsync(
@@ -106,18 +152,30 @@ public class FlightService : IFlightService
         return PaginatedResultDto<FlightDto>.Create(items, totalCount, request.PageNumber);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>No pagination. Intended for admin use only (FR-02.02).</remarks>
     public async Task<IEnumerable<FlightDto>> GetAllAsync()
     {
         var flights = await _uow.Flights.GetAllAsync();
         return flights.Select(f => ToDto(f));
     }
 
+    /// <inheritdoc/>
     public async Task<FlightDto?> GetByIdAsync(Guid id)
     {
         var flight = await _uow.Flights.GetByIdAsync(id);
         return flight is null ? null : ToDto(flight);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>POST-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item><c>AvailableCapacity</c> is initialised equal to <c>TotalCapacity</c>.</item>
+    ///   <item>Both <c>OriginAirportId</c> and <c>DestinationAirportId</c> are resolved
+    ///   from their IATA codes before the entity is persisted.</item>
+    /// </list>
+    /// </remarks>
     public async Task<FlightDto> CreateAsync(FlightUploadDto dto)
     {
         var origin = await _uow.Airports.GetByCodeAsync(dto.OriginAirportCode)
@@ -146,6 +204,11 @@ public class FlightService : IFlightService
         return ToDto(flight, origin.Code, destination.Code);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <b>BUSINESS RULE:</b> <c>AvailableCapacity</c> is intentionally not updated here
+    /// to avoid overwriting runtime seat availability. Only schedule fields are mutated.
+    /// </remarks>
     public async Task UpdateAsync(Guid id, FlightUploadDto dto)
     {
         var flight = await _uow.Flights.GetByIdAsync(id)
@@ -169,6 +232,7 @@ public class FlightService : IFlightService
         await _uow.SaveChangesAsync();
     }
 
+    /// <inheritdoc/>
     public async Task DeleteAsync(Guid id)
     {
         var flight = await _uow.Flights.GetByIdAsync(id)
