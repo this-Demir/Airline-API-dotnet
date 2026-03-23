@@ -42,6 +42,9 @@ public class AuthService : IAuthService
     /// </remarks>
     public async Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request)
     {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            throw new ArgumentException("Email and password must not be empty.");
+
         var existing = await _uow.Users.GetByEmailAsync(request.Email);
         if (existing is not null)
             throw new InvalidOperationException("Email is already registered.");

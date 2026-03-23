@@ -46,6 +46,8 @@ public class FlightService : IFlightService
     /// </remarks>
     public async Task<(int SuccessCount, List<string> Errors)> UploadFlightsFromCsvAsync(Stream csvStream)
     {
+        ArgumentNullException.ThrowIfNull(csvStream);
+
         var errors = new List<string>();
         var successCount = 0;
 
