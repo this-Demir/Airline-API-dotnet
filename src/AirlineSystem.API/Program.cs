@@ -116,3 +116,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.Run();
+
+// Required by WebApplicationFactory<Program> in integration tests.
+public partial class Program { }
