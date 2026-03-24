@@ -81,4 +81,36 @@ public class AuthEndpointsTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    // ── Input validation ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Register_EmptyEmail_Returns400()
+    {
+        // AuthService throws ArgumentException for empty email
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/register",
+            new { email = "", password = "Pass123!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Register_EmptyPassword_Returns400()
+    {
+        // AuthService throws ArgumentException for empty password
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/register",
+            new { email = $"{Guid.NewGuid()}@test.com", password = "" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Login_UnknownEmail_Returns401()
+    {
+        // AuthService throws UnauthorizedAccessException for unknown email (same message as wrong password)
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new { email = "never.registered.ever@ghost.com", password = "AnyPass1!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }

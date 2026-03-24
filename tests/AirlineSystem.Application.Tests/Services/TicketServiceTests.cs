@@ -41,7 +41,7 @@ public class TicketServiceTests
         new()
         {
             FlightNumber = "TK100",
-            Date = date ?? DateTime.UtcNow.AddDays(5),
+            FlightDate = date ?? DateTime.UtcNow.AddDays(5),
             PassengerNames = Enumerable.Range(1, passengerCount).Select(i => $"Passenger {i}").ToList()
         };
 

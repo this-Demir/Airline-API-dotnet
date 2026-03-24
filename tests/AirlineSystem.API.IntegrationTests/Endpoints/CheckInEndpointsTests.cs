@@ -25,8 +25,7 @@ public class CheckInEndpointsTests : IntegrationTestBase
         // Arrange — deliberately omit the Authorization header
         var payload = new
         {
-            flightNumber  = "TK999",
-            date          = "2099-01-01T00:00:00",
+            pnrCode       = "GHOST01",
             passengerName = "Ghost Passenger"
         };
 
@@ -43,8 +42,7 @@ public class CheckInEndpointsTests : IntegrationTestBase
         // Arrange
         var payload = new
         {
-            flightNumber  = "TK999",
-            date          = "2099-06-01T00:00:00",
+            pnrCode       = "UNKNOWN",
             passengerName = "Unknown Person"
         };
 
@@ -53,6 +51,140 @@ public class CheckInEndpointsTests : IntegrationTestBase
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
         // Assert — HTTP 200 with business-level failure in the body (FR-06.03)
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        doc.RootElement.GetProperty("status").GetString().Should().Be("Failed");
+    }
+
+    [Fact]
+    public async Task CheckIn_ValidPnrAndPassenger_NotCheckedIn_Returns200WithSuccess()
+    {
+        // Arrange — seed full graph: Airport → Flight → User → Booking (PNR=HAPPY01) → Passenger (not checked in)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AirlineDbContext>();
+
+            var origin = new Airport
+            {
+                Id = Guid.NewGuid(), Code = "IST3", Name = "Istanbul", City = "Istanbul",
+                CreatedAt = DateTime.UtcNow
+            };
+            var destination = new Airport
+            {
+                Id = Guid.NewGuid(), Code = "ADB3", Name = "Izmir", City = "Izmir",
+                CreatedAt = DateTime.UtcNow
+            };
+            var flight = new Flight
+            {
+                Id = Guid.NewGuid(), FlightNumber = "HAPPY01FLT",
+                DepartureDate = new DateTime(2099, 10, 1, 10, 0, 0, DateTimeKind.Utc),
+                ArrivalDate   = new DateTime(2099, 10, 1, 11, 0, 0, DateTimeKind.Utc),
+                DurationMinutes = 60, TotalCapacity = 100, AvailableCapacity = 99,
+                OriginAirportId = origin.Id, DestinationAirportId = destination.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            var user = new Domain.Entities.User
+            {
+                Id = Guid.NewGuid(), Email = "happy@checkin.test",
+                PasswordHash = "x", Role = Domain.Enums.UserRole.Customer,
+                CreatedAt = DateTime.UtcNow
+            };
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(), PnrCode = "HAPPY01",
+                TransactionDate = DateTime.UtcNow, UserId = user.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            var passenger = new Passenger
+            {
+                Id = Guid.NewGuid(), FullName = "Happy Flyer",
+                BookingId = booking.Id, FlightId = flight.Id,
+                IsCheckedIn = false, SeatNumber = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.Airports.AddRange(origin, destination);
+            db.Users.Add(user);
+            db.Flights.Add(flight);
+            db.Bookings.Add(booking);
+            db.Passengers.Add(passenger);
+            await db.SaveChangesAsync();
+        }
+
+        var payload = new { pnrCode = "HAPPY01", passengerName = "Happy Flyer" };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/v1/checkin", payload);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        doc.RootElement.GetProperty("status").GetString().Should().Be("Success");
+        doc.RootElement.GetProperty("seatNumber").GetInt32().Should().Be(1);
+        doc.RootElement.GetProperty("fullName").GetString().Should().Be("Happy Flyer");
+    }
+
+    [Fact]
+    public async Task CheckIn_ValidPnrWrongPassengerName_Returns200WithFailed()
+    {
+        // Arrange — same seed as above but we send a mismatched passenger name
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AirlineDbContext>();
+
+            var origin = new Airport
+            {
+                Id = Guid.NewGuid(), Code = "IST4", Name = "Istanbul", City = "Istanbul",
+                CreatedAt = DateTime.UtcNow
+            };
+            var destination = new Airport
+            {
+                Id = Guid.NewGuid(), Code = "ADB4", Name = "Izmir", City = "Izmir",
+                CreatedAt = DateTime.UtcNow
+            };
+            var flight = new Flight
+            {
+                Id = Guid.NewGuid(), FlightNumber = "WRONG01FLT",
+                DepartureDate = new DateTime(2099, 10, 2, 10, 0, 0, DateTimeKind.Utc),
+                ArrivalDate   = new DateTime(2099, 10, 2, 11, 0, 0, DateTimeKind.Utc),
+                DurationMinutes = 60, TotalCapacity = 100, AvailableCapacity = 99,
+                OriginAirportId = origin.Id, DestinationAirportId = destination.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            var user = new Domain.Entities.User
+            {
+                Id = Guid.NewGuid(), Email = "wrong@checkin.test",
+                PasswordHash = "x", Role = Domain.Enums.UserRole.Customer,
+                CreatedAt = DateTime.UtcNow
+            };
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(), PnrCode = "WRONG01",
+                TransactionDate = DateTime.UtcNow, UserId = user.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            var passenger = new Passenger
+            {
+                Id = Guid.NewGuid(), FullName = "Correct Name",
+                BookingId = booking.Id, FlightId = flight.Id,
+                IsCheckedIn = false, SeatNumber = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.Airports.AddRange(origin, destination);
+            db.Users.Add(user);
+            db.Flights.Add(flight);
+            db.Bookings.Add(booking);
+            db.Passengers.Add(passenger);
+            await db.SaveChangesAsync();
+        }
+
+        var payload = new { pnrCode = "WRONG01", passengerName = "Wrong Name" };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/v1/checkin", payload);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        // Assert — HTTP 200 with business-level failure (no matching passenger name)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         doc.RootElement.GetProperty("status").GetString().Should().Be("Failed");
     }
@@ -115,8 +247,7 @@ public class CheckInEndpointsTests : IntegrationTestBase
 
         var payload = new
         {
-            flightNumber  = "CHKIN01",
-            date          = "2099-07-01T10:00:00",
+            pnrCode       = "SEED01",
             passengerName = "Already Checked"
         };
 

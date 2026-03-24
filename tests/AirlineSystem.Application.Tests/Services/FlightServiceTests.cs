@@ -94,7 +94,7 @@ public class FlightServiceTests
     // ── Search / Delegation ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task SearchFlightsAsync_DelegatesCorrectlyAndReturnsPaginatedResult()
+    public async Task SearchFlightsAsync_OneWay_DelegatesCorrectlyAndReturnsOutbound()
     {
         // Ensure capacity filtering parameter is forwarded and pagination is wrapped correctly
         var futureFlight = new Flight
@@ -124,12 +124,65 @@ public class FlightServiceTests
 
         var result = await _sut.SearchFlightsAsync(request);
 
-        result.Items.Should().HaveCount(1);
-        result.TotalCount.Should().Be(1);
-        result.PageNumber.Should().Be(1);
-        // Verify repo was called with the correct numberOfSeats parameter
+        result.Outbound.Items.Should().HaveCount(1);
+        result.Outbound.TotalCount.Should().Be(1);
+        result.Outbound.PageNumber.Should().Be(1);
+        result.ReturnFlights.Should().BeNull();
         _mockFlightRepo.Verify(
             r => r.SearchFlightsAsync("IST", "ADB", It.IsAny<DateTime>(), It.IsAny<DateTime>(), 2, 1),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchFlightsAsync_RoundTrip_RunsTwoQueriesAndPopulatesReturnFlights()
+    {
+        // S0: round-trip request with IST→ADB
+        // S1: service runs outbound query (IST→ADB) and return query (ADB→IST)
+        var outboundFlight = new Flight
+        {
+            Id = Guid.NewGuid(), FlightNumber = "TK100",
+            DepartureDate = DateTime.UtcNow.AddDays(10),
+            ArrivalDate = DateTime.UtcNow.AddDays(10).AddHours(2),
+            AvailableCapacity = 10,
+            OriginAirport = new Airport { Code = "IST" },
+            DestinationAirport = new Airport { Code = "ADB" }
+        };
+        var returnFlight = new Flight
+        {
+            Id = Guid.NewGuid(), FlightNumber = "TK200",
+            DepartureDate = DateTime.UtcNow.AddDays(17),
+            ArrivalDate = DateTime.UtcNow.AddDays(17).AddHours(2),
+            AvailableCapacity = 10,
+            OriginAirport = new Airport { Code = "ADB" },
+            DestinationAirport = new Airport { Code = "IST" }
+        };
+
+        _mockFlightRepo
+            .Setup(r => r.SearchFlightsAsync("IST", "ADB", It.IsAny<DateTime>(), It.IsAny<DateTime>(), 2, 1))
+            .ReturnsAsync((new[] { outboundFlight }, 1));
+        _mockFlightRepo
+            .Setup(r => r.SearchFlightsAsync("ADB", "IST", It.IsAny<DateTime>(), It.IsAny<DateTime>(), 2, 1))
+            .ReturnsAsync((new[] { returnFlight }, 1));
+
+        var request = new FlightSearchRequestDto
+        {
+            OriginCode = "IST",
+            DestinationCode = "ADB",
+            DepartureFrom = DateTime.UtcNow,
+            DepartureTo = DateTime.UtcNow.AddDays(30),
+            NumberOfPeople = 2,
+            PageNumber = 1,
+            IsRoundTrip = true
+        };
+
+        var result = await _sut.SearchFlightsAsync(request);
+
+        result.Outbound.Items.Should().HaveCount(1);
+        result.ReturnFlights.Should().NotBeNull();
+        result.ReturnFlights!.Items.Should().HaveCount(1);
+        _mockFlightRepo.Verify(
+            r => r.SearchFlightsAsync(It.IsAny<string?>(), It.IsAny<string?>(),
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), 2, 1),
+            Times.Exactly(2));
     }
 }
