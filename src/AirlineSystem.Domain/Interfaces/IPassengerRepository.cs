@@ -9,26 +9,6 @@ namespace AirlineSystem.Domain.Interfaces;
 public interface IPassengerRepository : IGenericRepository<Passenger>
 {
     /// <summary>
-    /// Locates a passenger on a specific flight for the purpose of check-in validation.
-    /// </summary>
-    /// <remarks>
-    /// Implements the pre-condition check for FR-06: the passenger must hold a valid ticket
-    /// (i.e., a <see cref="Passenger"/> record linked to a <see cref="Domain.Entities.Booking"/>
-    /// must exist) on the specified flight before a seat can be assigned.
-    /// The name comparison should be case-insensitive.
-    /// Uses the composite index on <c>(FlightNumber, DepartureDate)</c> via the
-    /// <see cref="Domain.Entities.Flight"/> navigation property.
-    /// </remarks>
-    /// <param name="flightNumber">The flight number to search within (e.g., <c>"TK1923"</c>).</param>
-    /// <param name="departureDate">The departure date of the flight (UTC).</param>
-    /// <param name="fullName">The passenger's full name as recorded at booking time.</param>
-    /// <returns>
-    /// The matching <see cref="Passenger"/> entity, or <c>null</c> if no passenger
-    /// with the given name is found on the specified flight.
-    /// </returns>
-    Task<Passenger?> FindForCheckinAsync(string flightNumber, DateTime departureDate, string fullName);
-
-    /// <summary>
     /// Calculates the next sequential seat number to assign during check-in.
     /// </summary>
     /// <remarks>

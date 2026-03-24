@@ -43,7 +43,7 @@ public class FlightsController : ControllerBase
     /// <response code="200">Search results returned (may be an empty page).</response>
     [HttpGet("search")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(PaginatedResultDto<FlightDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FlightSearchResponseDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Search([FromQuery] FlightSearchRequestDto request)
     {
         var result = await _flightService.SearchFlightsAsync(request);

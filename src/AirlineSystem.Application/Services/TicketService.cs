@@ -46,8 +46,8 @@ public class TicketService : ITicketService
         if (request.PassengerNames.Count == 0)
             throw new ArgumentException("At least one passenger name is required.", nameof(request));
 
-        var flight = await _uow.Flights.GetByFlightNumberAndDateAsync(request.FlightNumber, request.Date)
-            ?? throw new KeyNotFoundException($"Flight '{request.FlightNumber}' on {request.Date:yyyy-MM-dd} was not found.");
+        var flight = await _uow.Flights.GetByFlightNumberAndDateAsync(request.FlightNumber, request.FlightDate)
+            ?? throw new KeyNotFoundException($"Flight '{request.FlightNumber}' on {request.FlightDate:yyyy-MM-dd} was not found.");
 
         if (flight.DepartureDate.ToUniversalTime() < DateTime.UtcNow)
             throw new InvalidOperationException(

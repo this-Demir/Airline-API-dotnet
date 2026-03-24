@@ -19,7 +19,7 @@ public interface IFlightService
     /// A paginated result (page size fixed at 10) containing only flights with
     /// <c>AvailableCapacity &gt;= NumberOfPeople</c>.
     /// </returns>
-    Task<PaginatedResultDto<FlightDto>> SearchFlightsAsync(FlightSearchRequestDto request);
+    Task<FlightSearchResponseDto> SearchFlightsAsync(FlightSearchRequestDto request);
 
     /// <summary>
     /// Bulk-imports flights from a CSV stream, applying per-row validation rules (FR-03).

@@ -18,8 +18,9 @@ public class CheckInService : ICheckInService
     /// <b>PRE-CONDITIONS:</b>
     /// <list type="bullet">
     ///   <item>No authentication is required (FR-06.04).</item>
-    ///   <item>A <c>Passenger</c> record linked to a <c>Booking</c> must exist for the
-    ///   specified flight, date, and passenger name — confirming a ticket was purchased.</item>
+    ///   <item>A <c>Booking</c> with the given <c>PnrCode</c> must exist.</item>
+    ///   <item>A <c>Passenger</c> with the given <c>PassengerName</c> (case-insensitive)
+    ///   must be linked to that booking.</item>
     ///   <item>The passenger's <c>IsCheckedIn</c> flag must be <c>false</c>.</item>
     /// </list>
     /// <b>POST-CONDITIONS:</b>
@@ -31,30 +32,37 @@ public class CheckInService : ICheckInService
     /// </list>
     /// <b>BUSINESS RULES:</b>
     /// <list type="bullet">
-    ///   <item>A passenger without a ticket (no matching <c>Passenger</c> record) receives
-    ///   <c>Status = "Failed"</c> — not an exception — to allow the API layer to return HTTP 200
-    ///   with a descriptive status body (FR-06.03).</item>
-    ///   <item>Re-checking an already checked-in passenger is silently rejected with
+    ///   <item>An unknown PNR or name mismatch returns <c>Status = "Failed"</c> (not an
+    ///   exception) so the API layer always returns HTTP 200 with a descriptive body (FR-06.03).</item>
+    ///   <item>Re-checking an already checked-in passenger is rejected with
     ///   <c>Status = "Failed"</c> to prevent duplicate seat assignment.</item>
     ///   <item>Seat numbering is sequential per flight, not per cabin class or booking order.</item>
     /// </list>
     /// </remarks>
     public async Task<CheckInResponseDto> CheckInPassengerAsync(CheckInRequestDto request)
     {
-        var passenger = await _uow.Passengers.FindForCheckinAsync(
-            request.FlightNumber, request.Date, request.PassengerName);
+        var booking = await _uow.Bookings.GetByPnrAsync(request.PnrCode);
+        if (booking is null)
+            return new CheckInResponseDto
+            {
+                Status  = "Failed",
+                Message = "No booking found for this PNR code."
+            };
+
+        var passenger = booking.Passengers
+            .FirstOrDefault(p => p.FullName.Equals(request.PassengerName, StringComparison.OrdinalIgnoreCase));
 
         if (passenger is null)
             return new CheckInResponseDto
             {
-                Status = "Failed",
-                Message = "No ticket found for this passenger on this flight."
+                Status  = "Failed",
+                Message = "No ticket found for this passenger on this booking."
             };
 
         if (passenger.IsCheckedIn)
             return new CheckInResponseDto
             {
-                Status = "Failed",
+                Status  = "Failed",
                 Message = "Passenger has already checked in."
             };
 
@@ -67,9 +75,9 @@ public class CheckInService : ICheckInService
 
         return new CheckInResponseDto
         {
-            Status = "Success",
+            Status     = "Success",
             SeatNumber = nextSeat,
-            FullName = passenger.FullName
+            FullName   = passenger.FullName
         };
     }
 }

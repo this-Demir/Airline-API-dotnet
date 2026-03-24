@@ -20,35 +20,6 @@ public class PassengerRepository : GenericRepository<Passenger>, IPassengerRepos
 
     /// <inheritdoc/>
     /// <remarks>
-    /// <b>_requires:</b>
-    /// <list type="bullet">
-    ///   <item><paramref name="flightNumber"/> is the airline flight code (e.g., <c>"TK1923"</c>).</item>
-    ///   <item><paramref name="departureDate"/> is the scheduled departure in UTC.</item>
-    ///   <item><paramref name="fullName"/> is the name as recorded at booking time.</item>
-    /// </list>
-    /// <b>_ensures:</b>
-    /// <list type="bullet">
-    ///   <item>The <see cref="Passenger.Flight"/> navigation property is eagerly loaded
-    ///   so the caller can access <c>passenger.FlightId</c> without an extra query.</item>
-    ///   <item>The <paramref name="fullName"/> comparison is case-insensitive.</item>
-    ///   <item>The date comparison uses <c>.Date</c> to ignore the time component,
-    ///   matching any departure time on the given calendar day.</item>
-    ///   <item>Returns <c>null</c> — not an exception — when no match is found,
-    ///   so <c>CheckInService</c> can return a <c>Status = "Failed"</c> response
-    ///   rather than propagating an error (FR-06.03).</item>
-    /// </list>
-    /// </remarks>
-    public async Task<Passenger?> FindForCheckinAsync(
-        string flightNumber, DateTime departureDate, string fullName) =>
-        await _context.Passengers
-            .Include(p => p.Flight)
-            .FirstOrDefaultAsync(p =>
-                p.Flight.FlightNumber == flightNumber &&
-                p.Flight.DepartureDate.Date == departureDate.Date &&
-                p.FullName.ToLower() == fullName.ToLower());
-
-    /// <inheritdoc/>
-    /// <remarks>
     /// <b>_requires:</b> <paramref name="flightId"/> is the internal GUID of an
     /// existing <see cref="Flight"/>.
     /// <b>_ensures:</b>

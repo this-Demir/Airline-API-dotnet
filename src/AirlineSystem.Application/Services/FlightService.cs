@@ -140,9 +140,9 @@ public class FlightService : IFlightService
     ///   <item>No state is mutated.</item>
     /// </list>
     /// </remarks>
-    public async Task<PaginatedResultDto<FlightDto>> SearchFlightsAsync(FlightSearchRequestDto request)
+    public async Task<FlightSearchResponseDto> SearchFlightsAsync(FlightSearchRequestDto request)
     {
-        var (flights, totalCount) = await _uow.Flights.SearchFlightsAsync(
+        var (outboundFlights, outboundCount) = await _uow.Flights.SearchFlightsAsync(
             request.OriginCode,
             request.DestinationCode,
             request.DepartureFrom,
@@ -150,22 +150,38 @@ public class FlightService : IFlightService
             request.NumberOfPeople,
             request.PageNumber);
 
-        var items = flights.Select(f => ToDto(f));
-        return PaginatedResultDto<FlightDto>.Create(items, totalCount, request.PageNumber);
+        var outbound = PaginatedResultDto<FlightDto>.Create(
+            outboundFlights.Select(f => ToDto(f)), outboundCount, request.PageNumber);
+
+        if (!request.IsRoundTrip)
+            return new FlightSearchResponseDto { Outbound = outbound };
+
+        var (returnFlights, returnCount) = await _uow.Flights.SearchFlightsAsync(
+            request.DestinationCode,
+            request.OriginCode,
+            request.DepartureFrom,
+            request.DepartureTo,
+            request.NumberOfPeople,
+            request.PageNumber);
+
+        var returnPaginated = PaginatedResultDto<FlightDto>.Create(
+            returnFlights.Select(f => ToDto(f)), returnCount, request.PageNumber);
+
+        return new FlightSearchResponseDto { Outbound = outbound, ReturnFlights = returnPaginated };
     }
 
     /// <inheritdoc/>
     /// <remarks>No pagination. Intended for admin use only (FR-02.02).</remarks>
     public async Task<IEnumerable<FlightDto>> GetAllAsync()
     {
-        var flights = await _uow.Flights.GetAllAsync();
+        var flights = await _uow.Flights.GetAllWithAirportsAsync();
         return flights.Select(f => ToDto(f));
     }
 
     /// <inheritdoc/>
     public async Task<FlightDto?> GetByIdAsync(Guid id)
     {
-        var flight = await _uow.Flights.GetByIdAsync(id);
+        var flight = await _uow.Flights.GetByIdWithAirportsAsync(id);
         return flight is null ? null : ToDto(flight);
     }
 

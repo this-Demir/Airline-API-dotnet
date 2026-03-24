@@ -48,8 +48,8 @@ public interface IFlightRepository : IGenericRepository<Flight>
     /// (before pagination), used to compute <c>TotalPages</c>.
     /// </returns>
     Task<(IEnumerable<Flight> Items, int TotalCount)> SearchFlightsAsync(
-        string originCode,
-        string destinationCode,
+        string? originCode,
+        string? destinationCode,
         DateTime departureFrom,
         DateTime departureTo,
         int numberOfSeats,
@@ -68,4 +68,17 @@ public interface IFlightRepository : IGenericRepository<Flight>
     /// <c>true</c> if a record with this composite key exists; <c>false</c> otherwise.
     /// </returns>
     Task<bool> ExistsAsync(string flightNumber, DateTime departureDate);
+
+    /// <summary>
+    /// Retrieves all flights with their <see cref="Airport"/> navigation properties eagerly loaded.
+    /// </summary>
+    /// <returns>All <see cref="Flight"/> entities with <c>OriginAirport</c> and <c>DestinationAirport</c> populated.</returns>
+    Task<IEnumerable<Flight>> GetAllWithAirportsAsync();
+
+    /// <summary>
+    /// Retrieves a single flight by its primary key with <see cref="Airport"/> navigation properties eagerly loaded.
+    /// </summary>
+    /// <param name="id">The flight's primary key.</param>
+    /// <returns>The matching <see cref="Flight"/> with airports populated, or <c>null</c> if not found.</returns>
+    Task<Flight?> GetByIdWithAirportsAsync(Guid id);
 }

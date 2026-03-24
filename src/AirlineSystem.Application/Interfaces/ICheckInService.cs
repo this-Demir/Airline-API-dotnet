@@ -13,7 +13,7 @@ public interface ICheckInService
     /// assigning the next available sequential seat number.
     /// </summary>
     /// <param name="request">
-    /// Check-in payload: flight number, departure date, and the passenger's full name.
+    /// Check-in payload: the booking's PNR code and the passenger's full name.
     /// </param>
     /// <returns>
     /// A <see cref="CheckInResponseDto"/> with one of two outcomes:

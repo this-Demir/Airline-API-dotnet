@@ -56,8 +56,8 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
     /// </list>
     /// </remarks>
     public async Task<(IEnumerable<Flight> Items, int TotalCount)> SearchFlightsAsync(
-        string originCode,
-        string destinationCode,
+        string? originCode,
+        string? destinationCode,
         DateTime departureFrom,
         DateTime departureTo,
         int numberOfSeats,
@@ -68,12 +68,15 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
         var query = _context.Flights
             .Include(f => f.OriginAirport)
             .Include(f => f.DestinationAirport)
-            .Where(f =>
-                f.OriginAirport.Code.ToUpper() == originCode.ToUpper() &&
-                f.DestinationAirport.Code.ToUpper() == destinationCode.ToUpper() &&
-                f.DepartureDate >= departureFrom &&
-                f.DepartureDate <= departureTo &&
-                f.AvailableCapacity >= numberOfSeats);
+            .Where(f => f.DepartureDate >= departureFrom
+                     && f.DepartureDate <= departureTo
+                     && f.AvailableCapacity >= numberOfSeats);
+
+        if (!string.IsNullOrWhiteSpace(originCode))
+            query = query.Where(f => f.OriginAirport.Code.ToUpper() == originCode.ToUpper());
+
+        if (!string.IsNullOrWhiteSpace(destinationCode))
+            query = query.Where(f => f.DestinationAirport.Code.ToUpper() == destinationCode.ToUpper());
 
         var totalCount = await query.CountAsync();
 
@@ -99,4 +102,18 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .AnyAsync(f =>
                 f.FlightNumber == flightNumber &&
                 f.DepartureDate.Date == departureDate.Date);
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Flight>> GetAllWithAirportsAsync() =>
+        await _context.Flights
+            .Include(f => f.OriginAirport)
+            .Include(f => f.DestinationAirport)
+            .ToListAsync();
+
+    /// <inheritdoc/>
+    public async Task<Flight?> GetByIdWithAirportsAsync(Guid id) =>
+        await _context.Flights
+            .Include(f => f.OriginAirport)
+            .Include(f => f.DestinationAirport)
+            .FirstOrDefaultAsync(f => f.Id == id);
 }
