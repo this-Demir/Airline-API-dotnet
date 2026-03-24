@@ -35,6 +35,10 @@ appsettings.*.json
 .env.*
 secrets.json
 
+## Load test credentials — NEVER commit real values
+load-tests/.env
+load-tests/*.env
+
 ## OS
 .DS_Store
 Thumbs.db
