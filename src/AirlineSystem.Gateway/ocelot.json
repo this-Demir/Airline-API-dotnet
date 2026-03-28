@@ -13,7 +13,7 @@
         "ClientWhitelist": [],
         "EnableRateLimiting": true,
         "Period": "1d",
-        "PeriodTimespan": 1,
+        "PeriodTimespan": 86400,
         "Limit": 3
       }
     },
@@ -35,7 +35,7 @@
       "DisableRateLimitHeaders": false,
       "QuotaExceededMessage": "Too many requests. Please try again later.",
       "HttpStatusCode": 429,
-      "EnableRateLimiting": false
+      "EnableRateLimiting": true
     }
   },
   "SwaggerEndPoints": [
