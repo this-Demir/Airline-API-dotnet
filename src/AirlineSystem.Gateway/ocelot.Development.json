@@ -1,0 +1,28 @@
+{
+  "Routes": [
+    {
+      "UpstreamPathTemplate": "/api/v1/flights/search",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5203 }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/api/v1/{everything}",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5203 }
+      ]
+    }
+  ],
+  "SwaggerEndPoints": [
+    {
+      "Key": "airline-api",
+      "Config": [
+        {
+          "Name": "Airline Ticketing API",
+          "Version": "v1",
+          "Url": "http://localhost:5203/swagger/v1/swagger.json"
+        }
+      ]
+    }
+  ]
+}

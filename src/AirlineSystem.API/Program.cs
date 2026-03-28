@@ -100,6 +100,21 @@ builder.Services.AddSwaggerGen(options =>
 // ── Build & Pipeline ─────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// Apply pending EF Core migrations on startup so the containerised app works
+// against a fresh MySQL volume without a manual `dotnet ef database update`.
+// Guard against InMemory provider used by integration tests — MigrateAsync is
+// relational-only and throws on non-relational providers.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AirlineDbContext>();
+    if (db.Database.IsRelational())
+        await db.Database.MigrateAsync();
+    else
+        await db.Database.EnsureCreatedAsync();
+}
+
+await SeedEssentials.SeedAdminAsync(app.Services, app.Configuration);
+
 // Global exception handler must be the first middleware so it catches
 // exceptions from all subsequent layers.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -108,8 +123,7 @@ app.UseSwagger();
 app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Airline Ticketing API v1"));
 
-app.UseHttpsRedirection();
-
+// HTTPS termination is handled at the reverse proxy (gateway) level.
 // Authentication must precede Authorization.
 app.UseAuthentication();
 app.UseAuthorization();
