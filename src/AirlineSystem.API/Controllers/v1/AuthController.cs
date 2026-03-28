@@ -28,15 +28,15 @@ public class AuthController : ControllerBase
     /// </remarks>
     /// <param name="request">Registration payload containing email and plain-text password.</param>
     /// <returns>A JWT token and the assigned role (<c>"Customer"</c>).</returns>
-    /// <response code="200">Registration successful; JWT returned.</response>
+    /// <response code="201">Registration successful; JWT returned.</response>
     /// <response code="400">Email is already registered or request data is invalid.</response>
     [HttpPost("register")]
-    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
     {
         var result = await _authService.RegisterAsync(request);
-        return Ok(result);
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     /// <summary>

@@ -46,7 +46,7 @@ import http  from 'k6/http';
 import { check, sleep } from 'k6';
 
 // ── Configuration ──────────────────────────────────────────────────────────────
-const BASE_URL = (__ENV.BASE_URL || 'http://localhost:5203').replace(/\/$/, '');
+const BASE_URL = (__ENV.BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 export const options = {
   stages: [

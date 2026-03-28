@@ -17,7 +17,7 @@ public class AuthEndpointsTests : IntegrationTestBase
     // ── Register ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Register_ValidPayload_Returns200WithToken()
+    public async Task Register_ValidPayload_Returns201WithToken()
     {
         // Arrange
         var payload = new { email = $"{Guid.NewGuid()}@test.com", password = "Pass123!" };
@@ -27,7 +27,7 @@ public class AuthEndpointsTests : IntegrationTestBase
         var body     = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         body.Should().NotBeNull();
         body!.Token.Should().NotBeNullOrEmpty();
         body.Role.Should().Be("Customer");
