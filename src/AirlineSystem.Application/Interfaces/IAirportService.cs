@@ -40,4 +40,52 @@ public interface IAirportService
     /// <param name="id">The internal GUID of the airport to delete.</param>
     /// <exception cref="KeyNotFoundException">Thrown when the airport is not found.</exception>
     Task DeleteAsync(Guid id);
+
+    /// <summary>
+    /// Inserts multiple airports in a single transaction using <b>insert-ignore</b> semantics.
+    /// Duplicate IATA codes — whether repeated within the request payload or already present
+    /// in the database — are silently skipped rather than rejected.
+    /// </summary>
+    /// <param name="dtos">
+    /// A non-empty list of airport records to create. Each item must supply
+    /// <c>Code</c>, <c>Name</c>, and <c>City</c>.
+    /// </param>
+    /// <returns>
+    /// An <see cref="AirportBatchResponseDto"/> that contains:
+    /// <list type="bullet">
+    ///   <item>A human-readable <c>Message</c> summarising how many records were inserted
+    ///   and how many were skipped.</item>
+    ///   <item>The <c>Airports</c> collection of newly persisted records (may be empty when
+    ///   all provided codes already existed).</item>
+    ///   <item>The <c>SkippedCodes</c> collection of IATA codes that were not inserted
+    ///   (empty when every code was new).</item>
+    /// </list>
+    /// </returns>
+    /// <remarks>
+    /// <b>PRE-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item><paramref name="dtos"/> contains at least one entry.</item>
+    /// </list>
+    /// <b>POST-CONDITIONS:</b>
+    /// <list type="bullet">
+    ///   <item>Only records whose codes do not already exist in the database are persisted,
+    ///   in a single <c>SaveChangesAsync</c> call.</item>
+    ///   <item>If all codes were duplicates, no database write is issued and the returned
+    ///   <c>Airports</c> collection is empty.</item>
+    /// </list>
+    /// <b>BUSINESS RULES:</b>
+    /// <list type="bullet">
+    ///   <item>Codes are normalised to upper-case before insertion and before duplicate
+    ///   comparison.</item>
+    ///   <item>When the same code appears more than once in <paramref name="dtos"/>, only the
+    ///   first occurrence is kept; subsequent occurrences are treated as intra-batch
+    ///   duplicates and added to <c>SkippedCodes</c>.</item>
+    ///   <item>Codes that already exist in the database are also added to
+    ///   <c>SkippedCodes</c> via a single <c>WHERE Code IN (...)</c> query.</item>
+    /// </list>
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="dtos"/> contains no elements.
+    /// </exception>
+    Task<AirportBatchResponseDto> CreateBatchAsync(IEnumerable<AirportRequestDto> dtos);
 }

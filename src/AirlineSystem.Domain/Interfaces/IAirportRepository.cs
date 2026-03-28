@@ -21,4 +21,19 @@ public interface IAirportRepository : IGenericRepository<Airport>
     /// with the given code.
     /// </returns>
     Task<Airport?> GetByCodeAsync(string code);
+
+    /// <summary>
+    /// Returns all airports whose IATA codes are present in the provided set.
+    /// </summary>
+    /// <remarks>
+    /// Performs a single <c>WHERE Code IN (...)</c> query, used by the batch-insert
+    /// service to detect duplicate codes before attempting insertion.
+    /// Comparison is case-insensitive.
+    /// </remarks>
+    /// <param name="codes">The IATA codes to look up.</param>
+    /// <returns>
+    /// A (possibly empty) collection of <see cref="Airport"/> entities whose codes
+    /// match any value in <paramref name="codes"/>.
+    /// </returns>
+    Task<IEnumerable<Airport>> GetByCodesAsync(IEnumerable<string> codes);
 }

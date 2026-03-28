@@ -36,6 +36,13 @@ public interface IGenericRepository<T> where T : BaseEntity
     Task AddAsync(T entity);
 
     /// <summary>
+    /// Stages a collection of new entities for batch insertion. Nothing is persisted until
+    /// <c>IUnitOfWork.SaveChangesAsync</c> is invoked.
+    /// </summary>
+    /// <param name="entities">The fully initialised entities to insert. Must not be <c>null</c> or empty.</param>
+    Task AddRangeAsync(IEnumerable<T> entities);
+
+    /// <summary>
     /// Marks an existing entity as modified. Changes are not written to the store until
     /// <c>IUnitOfWork.SaveChangesAsync</c> is invoked.
     /// </summary>

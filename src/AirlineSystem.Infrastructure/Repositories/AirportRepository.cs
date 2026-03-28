@@ -30,4 +30,17 @@ public class AirportRepository : GenericRepository<Airport>, IAirportRepository
     public async Task<Airport?> GetByCodeAsync(string code) =>
         await _context.Airports
             .FirstOrDefaultAsync(a => a.Code.ToUpper() == code.ToUpper());
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Normalises all incoming codes to upper-case and issues a single
+    /// <c>WHERE Code IN (...)</c> query against the Airports table.
+    /// </remarks>
+    public async Task<IEnumerable<Airport>> GetByCodesAsync(IEnumerable<string> codes)
+    {
+        var upper = codes.Select(c => c.ToUpper()).ToList();
+        return await _context.Airports
+            .Where(a => upper.Contains(a.Code))
+            .ToListAsync();
+    }
 }

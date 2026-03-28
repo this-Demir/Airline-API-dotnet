@@ -56,6 +56,15 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Calls <c>DbSet.AddRangeAsync</c> which sets all entity states to
+    /// <c>Added</c>. The INSERT SQL statements are generated and sent only when
+    /// <c>SaveChangesAsync</c> is invoked on the owning <see cref="AirlineDbContext"/>.
+    /// </remarks>
+    public async Task AddRangeAsync(IEnumerable<T> entities) =>
+        await _context.Set<T>().AddRangeAsync(entities);
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Calls <see cref="DbSet{TEntity}.Update"/> which sets the entity state to
     /// <c>Modified</c>. All scalar properties are included in the UPDATE statement.
     /// </remarks>

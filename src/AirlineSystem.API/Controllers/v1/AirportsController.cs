@@ -95,6 +95,42 @@ public class AirportsController : ControllerBase
     }
 
     /// <summary>
+    /// Creates multiple airport records in a single batch transaction using
+    /// <b>insert-ignore</b> semantics.
+    /// </summary>
+    /// <param name="dtos">
+    /// A non-empty JSON array of airport objects. Each element must include
+    /// <c>code</c> (IATA), <c>name</c>, and <c>city</c>.
+    /// </param>
+    /// <returns>
+    /// An <see cref="AirportBatchResponseDto"/> containing a human-readable
+    /// <c>message</c>, the <c>airports</c> that were newly persisted, and the
+    /// <c>skippedCodes</c> that were already present (intra-batch or in the DB).
+    /// </returns>
+    /// <remarks>
+    /// Duplicate IATA codes are never treated as an error. They are silently skipped
+    /// and reported in <c>skippedCodes</c>. The response is always <c>200 OK</c>,
+    /// even when every supplied code already existed and <c>airports</c> is empty.
+    /// </remarks>
+    /// <response code="200">
+    /// Batch processed successfully. Inspect <c>airports</c> for inserted records
+    /// and <c>skippedCodes</c> for any codes that were ignored.
+    /// </response>
+    /// <response code="400">The supplied list is empty.</response>
+    /// <response code="401">Missing or invalid JWT token.</response>
+    /// <response code="403">Caller does not have the Admin role.</response>
+    [HttpPost("batch")]
+    [ProducesResponseType(typeof(AirportBatchResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> CreateBatch([FromBody] IEnumerable<AirportRequestDto> dtos)
+    {
+        var result = await _airportService.CreateBatchAsync(dtos);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Permanently deletes an airport record.
     /// </summary>
     /// <param name="id">The internal GUID of the airport to delete.</param>

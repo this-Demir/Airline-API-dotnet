@@ -117,6 +117,64 @@ public class AirportService : IAirportService
         await _uow.SaveChangesAsync();
     }
 
+    /// <inheritdoc/>
+    public async Task<AirportBatchResponseDto> CreateBatchAsync(IEnumerable<AirportRequestDto> dtos)
+    {
+        var list = dtos.ToList();
+
+        if (list.Count == 0)
+            throw new ArgumentException("The airport list must not be empty.");
+
+        // S0 → S1: deduplicate within the batch (first occurrence wins)
+        var skipped = new List<string>();
+        var seen    = new HashSet<string>();
+        var unique  = new List<AirportRequestDto>();
+
+        foreach (var dto in list)
+        {
+            var upper = dto.Code.ToUpper();
+            if (!seen.Add(upper))
+                skipped.Add(upper);
+            else
+                unique.Add(dto);
+        }
+
+        // S1 → S2: single query to find codes that already exist in the DB
+        var dbExisting = await _uow.Airports.GetByCodesAsync(seen);
+        var dbCodes    = dbExisting.Select(a => a.Code).ToHashSet();
+
+        var toInsert = unique.Where(d => !dbCodes.Contains(d.Code.ToUpper())).ToList();
+        skipped.AddRange(dbCodes);
+
+        // S2 → S3: persist only the new records (skip entirely if nothing is new)
+        var now      = DateTime.UtcNow;
+        var airports = toInsert.Select(dto => new Airport
+        {
+            Id        = Guid.NewGuid(),
+            Code      = dto.Code.ToUpper(),
+            Name      = dto.Name,
+            City      = dto.City,
+            CreatedAt = now
+        }).ToList();
+
+        if (airports.Count > 0)
+        {
+            await _uow.Airports.AddRangeAsync(airports);
+            await _uow.SaveChangesAsync();
+        }
+
+        var message = skipped.Count > 0
+            ? $"Successfully added {airports.Count} airport(s). Skipped {skipped.Count} duplicate(s): {string.Join(", ", skipped)}."
+            : $"Successfully added {airports.Count} airport(s).";
+
+        return new AirportBatchResponseDto
+        {
+            Message      = message,
+            Airports     = airports.Select(ToDto),
+            SkippedCodes = skipped
+        };
+    }
+
     private static AirportDto ToDto(Airport a) =>
         new() { Id = a.Id, Code = a.Code, Name = a.Name, City = a.City };
 }

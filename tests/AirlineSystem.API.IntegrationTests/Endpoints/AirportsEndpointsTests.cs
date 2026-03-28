@@ -217,4 +217,71 @@ public class AirportsEndpointsTests : IntegrationTestBase
         // Assert — KeyNotFoundException mapped to 404 by ExceptionHandlingMiddleware
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // ── Batch Insert ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateBatch_AdminToken_ValidList_Returns200WithCreatedAirports()
+    {
+        // Arrange
+        var token   = await GetAdminTokenAsync();
+        var request = Authorized(HttpMethod.Post, "/api/v1/airports/batch", token);
+        request.Content = JsonContent.Create(new[]
+        {
+            new { code = "BA1", name = "Batch Airport One", city = "CityOne" },
+            new { code = "BA2", name = "Batch Airport Two", city = "CityTwo" }
+        });
+
+        // Act
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        doc.RootElement.GetProperty("message").GetString().Should().Contain("Successfully added 2");
+
+        var airports = doc.RootElement.GetProperty("airports").EnumerateArray().ToList();
+        airports.Should().HaveCount(2);
+        airports.Select(a => a.GetProperty("code").GetString())
+                .Should().BeEquivalentTo(["BA1", "BA2"]);
+
+        // No codes were skipped — all were new
+        doc.RootElement.GetProperty("skippedCodes").EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateBatch_AdminToken_DuplicateCode_Returns200WithSkippedCodes()
+    {
+        // S0: pre-create "BCH" via single endpoint so it already exists in the DB
+        var token = await GetAdminTokenAsync();
+        var seed  = Authorized(HttpMethod.Post, "/api/v1/airports", token);
+        seed.Content = JsonContent.Create(new { code = "BCH", name = "Batch Conflict Hub", city = "ConflictCity" });
+        await _client.SendAsync(seed);
+
+        // S1: batch containing the already-existing code plus a genuinely new code
+        var request = Authorized(HttpMethod.Post, "/api/v1/airports/batch", token);
+        request.Content = JsonContent.Create(new[]
+        {
+            new { code = "BCH", name = "Batch Conflict Hub Dup", city = "ConflictCity" },
+            new { code = "BCX", name = "Batch Conflict Extra",   city = "ExtraCity"    }
+        });
+        var response = await _client.SendAsync(request);
+
+        // S2: insert-ignore → still 200, BCH is in skippedCodes, BCX is inserted
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        doc.RootElement.GetProperty("message").GetString().Should().Contain("Skipped 1 duplicate(s)");
+
+        var airports = doc.RootElement.GetProperty("airports").EnumerateArray().ToList();
+        airports.Should().HaveCount(1);
+        airports[0].GetProperty("code").GetString().Should().Be("BCX");
+
+        var skipped = doc.RootElement.GetProperty("skippedCodes")
+                         .EnumerateArray()
+                         .Select(e => e.GetString())
+                         .ToList();
+        skipped.Should().Contain("BCH");
+    }
 }
