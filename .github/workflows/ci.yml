@@ -7,6 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
+  # ── 1. Build and test ──────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -28,60 +29,97 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
 
-  build-and-push:
+  # ── 2. Build and push both images to ECR (single repo, prefixed tags) ─────
+  #
+  #  Tags written to the one ECR repo (ECR_REPO):
+  #    api-<sha>       gateway-<sha>
+  #    api-latest      gateway-latest
+  build-push:
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Only deploy on direct pushes to main — not on PRs.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
-      id-token: write   # Required for OIDC authentication to Azure
+      id-token: write
       contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Passwordless Azure login via OIDC — no stored credentials required.
-      # Prerequisites: create a Federated Identity Credential in an App Registration
-      # and add AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as GitHub Secrets.
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Log in to Azure Container Registry
-        run: az acr login --name ${{ secrets.ACR_REGISTRY }}
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPO }}
+          SHA: ${{ github.sha }}
         run: |
+          IMAGE_URI="$REGISTRY/$REPO"
           docker build \
             -f src/AirlineSystem.API/Dockerfile \
-            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }} \
-            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:latest \
+            -t "$IMAGE_URI:api-$SHA" \
+            -t "$IMAGE_URI:api-latest" \
             .
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }}
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:latest
+          docker push "$IMAGE_URI:api-$SHA"
+          docker push "$IMAGE_URI:api-latest"
 
       - name: Build and push Gateway image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPO }}
+          SHA: ${{ github.sha }}
         run: |
+          IMAGE_URI="$REGISTRY/$REPO"
           docker build \
             -f src/AirlineSystem.Gateway/Dockerfile \
-            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }} \
-            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:latest \
+            -t "$IMAGE_URI:gateway-$SHA" \
+            -t "$IMAGE_URI:gateway-latest" \
             .
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }}
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:latest
+          docker push "$IMAGE_URI:gateway-$SHA"
+          docker push "$IMAGE_URI:gateway-latest"
 
-      - name: Deploy API to Azure App Service
-        uses: azure/webapps-deploy@v3
+  # ── 3. SSH deploy to EC2 ──────────────────────────────────────────────────
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          app-name: ${{ secrets.API_APP_NAME }}
-          images: ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
 
-      - name: Deploy Gateway to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.GATEWAY_APP_NAME }}
-          images: ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }}
+            REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+            BACKEND_IMAGE="$REGISTRY/${{ secrets.ECR_REPO }}:api-${{ github.sha }}"
+            GATEWAY_IMAGE="$REGISTRY/${{ secrets.ECR_REPO }}:gateway-${{ github.sha }}"
+
+            # Authenticate Docker to ECR using the EC2 instance IAM role
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+              | docker login --username AWS --password-stdin "$REGISTRY"
+
+            cd ~/airline-app
+
+            # Pull both images
+            docker pull "$BACKEND_IMAGE"
+            docker pull "$GATEWAY_IMAGE"
+
+            # Export image URIs so docker-compose uses the pulled ECR images
+            export BACKEND_IMAGE="$BACKEND_IMAGE"
+            export GATEWAY_IMAGE="$GATEWAY_IMAGE"
+
+            # Restart application stack (skip monitoring stack)
+            docker compose up -d --no-build mysql backend-api gateway-api
+
+            # Free up disk space on the free-tier instance
+            docker image prune -f

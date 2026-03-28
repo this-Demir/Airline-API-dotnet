@@ -7,7 +7,7 @@
       "DownstreamPathTemplate": "/api/v1/flights/search",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "backend-api", "Port": 80 }
+        { "Host": "backend-api", "Port": 8080 }
       ],
       "RateLimitOptions": {
         "ClientWhitelist": [],
@@ -24,7 +24,7 @@
       "DownstreamPathTemplate": "/api/v1/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "backend-api", "Port": 80 }
+        { "Host": "backend-api", "Port": 8080 }
       ]
     }
   ],

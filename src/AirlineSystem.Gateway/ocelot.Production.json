@@ -1,5 +1,5 @@
 {
   "GlobalConfiguration": {
-    "BaseUrl": "https://app-airline-gateway.azurewebsites.net"
+    "BaseUrl": "http://${EC2_PUBLIC_IP}:5000"
   }
 }

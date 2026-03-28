@@ -15,10 +15,11 @@ builder.Configuration.AddJsonFile(
 // coordinates via configuration/env vars without modifying ocelot.json.
 // Falls back to the Docker Compose service name so local runs are unaffected.
 var apiHost   = builder.Configuration["ApiDownstream:Host"]   ?? "backend-api";
-var apiPort   = builder.Configuration["ApiDownstream:Port"]   ?? "80";
+var apiPort   = builder.Configuration["ApiDownstream:Port"]   ?? "8080";
 var apiScheme = builder.Configuration["ApiDownstream:Scheme"] ?? "http";
 
-foreach (var i in new[] { "0", "1" })
+var routeCount = builder.Configuration.GetSection("Routes").GetChildren().Count();
+for (var i = 0; i < routeCount; i++)
 {
     builder.Configuration[$"Routes:{i}:DownstreamHostAndPorts:0:Host"] = apiHost;
     builder.Configuration[$"Routes:{i}:DownstreamHostAndPorts:0:Port"] = apiPort;
