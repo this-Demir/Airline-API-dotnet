@@ -1,0 +1,47 @@
+# Build outputs — keeps context lean and prevents stale local artifacts
+# from shadowing the in-container dotnet publish output
+**/bin/
+**/obj/
+
+# Git history
+.git/
+.gitignore
+
+# IDE / OS artifacts
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Test projects — not needed in production images
+tests/
+TestResults/
+coverage/
+*.trx
+*.coveragexml
+
+# Load testing
+load-tests/
+
+# CI/CD and infrastructure-as-code
+.github/
+docker-compose.yml
+docker-compose*.yml
+
+# Documentation
+docs/
+*.md
+
+# Secrets and local config (belt-and-suspenders — already in .gitignore)
+.env
+.env.*
+secrets.json
+
+# Claude / agent artifacts
+.claude/
+.agent/
+.claudeignore
+CLAUDE.md
