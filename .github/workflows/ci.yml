@@ -1,4 +1,4 @@
-name: CI
+name: CI / CD
 
 on:
   push:
@@ -27,3 +27,61 @@ jobs:
 
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
+
+  build-and-push:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    # Only deploy on direct pushes to main — not on PRs.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      id-token: write   # Required for OIDC authentication to Azure
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Passwordless Azure login via OIDC — no stored credentials required.
+      # Prerequisites: create a Federated Identity Credential in an App Registration
+      # and add AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as GitHub Secrets.
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name ${{ secrets.ACR_REGISTRY }}
+
+      - name: Build and push API image
+        run: |
+          docker build \
+            -f src/AirlineSystem.API/Dockerfile \
+            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }} \
+            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:latest \
+            .
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }}
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:latest
+
+      - name: Build and push Gateway image
+        run: |
+          docker build \
+            -f src/AirlineSystem.Gateway/Dockerfile \
+            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }} \
+            -t ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:latest \
+            .
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }}
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:latest
+
+      - name: Deploy API to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.API_APP_NAME }}
+          images: ${{ secrets.ACR_REGISTRY }}/${{ vars.API_IMAGE_NAME || 'airline-api' }}:${{ github.sha }}
+
+      - name: Deploy Gateway to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.GATEWAY_APP_NAME }}
+          images: ${{ secrets.ACR_REGISTRY }}/${{ vars.GATEWAY_IMAGE_NAME || 'airline-gateway' }}:${{ github.sha }}

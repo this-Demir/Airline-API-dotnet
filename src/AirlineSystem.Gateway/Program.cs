@@ -11,6 +11,23 @@ builder.Configuration.AddJsonFile(
     optional: true,
     reloadOnChange: true);
 
+// Allow Azure App Service (or any host) to override the downstream API
+// coordinates via configuration/env vars without modifying ocelot.json.
+// Falls back to the Docker Compose service name so local runs are unaffected.
+var apiHost   = builder.Configuration["ApiDownstream:Host"]   ?? "backend-api";
+var apiPort   = builder.Configuration["ApiDownstream:Port"]   ?? "80";
+var apiScheme = builder.Configuration["ApiDownstream:Scheme"] ?? "http";
+
+foreach (var i in new[] { "0", "1" })
+{
+    builder.Configuration[$"Routes:{i}:DownstreamHostAndPorts:0:Host"] = apiHost;
+    builder.Configuration[$"Routes:{i}:DownstreamHostAndPorts:0:Port"] = apiPort;
+    builder.Configuration[$"Routes:{i}:DownstreamScheme"] = apiScheme;
+}
+builder.Configuration["SwaggerEndPoints:0:Config:0:Url"] =
+    $"{apiScheme}://{apiHost}/swagger/v1/swagger.json";
+
+builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOcelot(builder.Configuration);
 builder.Services.AddSwaggerForOcelot(builder.Configuration);
@@ -29,6 +46,10 @@ app.Use(async (context, next) =>
 // MMLib serves Swagger UI at /swagger and proxies downstream swagger.json.
 // Must be registered BEFORE UseOcelot so its /swagger routes take priority.
 app.UseSwaggerForOcelotUI();
+
+// Health check must be mapped before UseOcelot — Ocelot is terminal middleware
+// and swallows all requests that reach it, including /health.
+app.MapHealthChecks("/health");
 
 await app.UseOcelot();
 
