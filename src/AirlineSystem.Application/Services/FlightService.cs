@@ -130,8 +130,9 @@ public class FlightService : IFlightService
     /// <b>PRE-CONDITIONS:</b>
     /// <list type="bullet">
     ///   <item>No authentication required (FR-04.06).</item>
+    ///   <item>When supplied, <c>DepartureFrom</c> and <c>DepartureTo</c> must be in
+    ///   <c>yyyy-MM-dd</c> format (e.g. <c>"2025-06-01"</c>).</item>
     ///   <item><c>NumberOfPeople</c> must be &gt;= 1.</item>
-    ///   <item><c>DepartureTo</c> must be &gt;= <c>DepartureFrom</c>.</item>
     /// </list>
     /// <b>POST-CONDITIONS:</b>
     /// <list type="bullet">
@@ -139,14 +140,25 @@ public class FlightService : IFlightService
     ///   <item>Results are paginated with a fixed page size of 10 (FR-04.05).</item>
     ///   <item>No state is mutated.</item>
     /// </list>
+    /// <b>BUSINESS RULES:</b>
+    /// <list type="bullet">
+    ///   <item>Omitting <c>DepartureFrom</c> defaults to today's UTC date.</item>
+    ///   <item>Omitting <c>DepartureTo</c> defaults to 6 months from today (UTC).</item>
+    ///   <item>Omitting <c>OriginCode</c> or <c>DestinationCode</c> disables that filter
+    ///   (flights from/to all airports are included).</item>
+    /// </list>
     /// </remarks>
     public async Task<FlightSearchResponseDto> SearchFlightsAsync(FlightSearchRequestDto request)
     {
+        var today = DateTime.UtcNow.Date;
+        var from  = ParseDate(request.DepartureFrom, nameof(request.DepartureFrom)) ?? today;
+        var to    = ParseDate(request.DepartureTo,   nameof(request.DepartureTo))   ?? today.AddMonths(6);
+
         var (outboundFlights, outboundCount) = await _uow.Flights.SearchFlightsAsync(
             request.OriginCode,
             request.DestinationCode,
-            request.DepartureFrom,
-            request.DepartureTo,
+            from,
+            to,
             request.NumberOfPeople,
             request.PageNumber);
 
@@ -159,8 +171,8 @@ public class FlightService : IFlightService
         var (returnFlights, returnCount) = await _uow.Flights.SearchFlightsAsync(
             request.DestinationCode,
             request.OriginCode,
-            request.DepartureFrom,
-            request.DepartureTo,
+            from,
+            to,
             request.NumberOfPeople,
             request.PageNumber);
 
@@ -168,6 +180,25 @@ public class FlightService : IFlightService
             returnFlights.Select(f => ToDto(f)), returnCount, request.PageNumber);
 
         return new FlightSearchResponseDto { Outbound = outbound, ReturnFlights = returnPaginated };
+    }
+
+    /// <summary>
+    /// Parses a nullable date string in strict <c>yyyy-MM-dd</c> format.
+    /// Returns <c>null</c> when <paramref name="value"/> is null or whitespace,
+    /// allowing the caller to apply its own default.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the value is non-empty but does not match <c>yyyy-MM-dd</c>.
+    /// Maps to HTTP 400 via <c>ExceptionHandlingMiddleware</c>.
+    /// </exception>
+    private static DateTime? ParseDate(string? value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (DateTime.TryParseExact(value, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            return dt;
+        throw new ArgumentException(
+            $"Invalid date format for '{paramName}': '{value}'. Expected yyyy-MM-dd (e.g. 2025-06-01).");
     }
 
     /// <inheritdoc/>

@@ -31,19 +31,38 @@ public class FlightsController : ControllerBase
     /// passenger count (FR-04). Results are paginated (page size fixed at 10).
     /// </summary>
     /// <remarks>
+    /// <b>All parameters are optional.</b> When the request is sent without any query
+    /// string the endpoint automatically applies the following defaults:
+    /// <list type="table">
+    ///   <listheader><term>Parameter</term><description>Default</description></listheader>
+    ///   <item><term><c>DepartureFrom</c></term><description>Today's UTC date</description></item>
+    ///   <item><term><c>DepartureTo</c></term><description>6 months from today (UTC)</description></item>
+    ///   <item><term><c>OriginCode</c></term><description>All origins (no filter)</description></item>
+    ///   <item><term><c>DestinationCode</c></term><description>All destinations (no filter)</description></item>
+    ///   <item><term><c>NumberOfPeople</c></term><description>1</description></item>
+    ///   <item><term><c>IsRoundTrip</c></term><description>false</description></item>
+    ///   <item><term><c>PageNumber</c></term><description>1</description></item>
+    /// </list>
+    /// <b>Date format:</b> <c>DepartureFrom</c> and <c>DepartureTo</c> must be supplied in
+    /// <c>yyyy-MM-dd</c> format (e.g., <c>2025-06-01</c>). Any other format returns 400.<br/>
     /// Flights where <c>AvailableCapacity &lt; NumberOfPeople</c> are excluded
     /// from results (FR-04.03). Rate limiting (max 3 calls/day per IP) is enforced
     /// at the API Gateway level (NFR-02.03) and is not implemented in this controller.
     /// </remarks>
     /// <param name="request">
-    /// Search parameters bound from query string: origin/destination IATA codes,
-    /// departure date range, number of passengers, round-trip flag, and page number.
+    /// Optional search filters bound from the query string. See remarks for defaults
+    /// and the required date format.
     /// </param>
-    /// <returns>A paginated list of matching <see cref="FlightDto"/> records.</returns>
+    /// <returns>
+    /// A <see cref="FlightSearchResponseDto"/> containing a paginated <c>outbound</c> list
+    /// and, when <c>IsRoundTrip=true</c>, a paginated <c>returnFlights</c> list.
+    /// </returns>
     /// <response code="200">Search results returned (may be an empty page).</response>
+    /// <response code="400">A date parameter was supplied in an unsupported format (expected <c>yyyy-MM-dd</c>).</response>
     [HttpGet("search")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(FlightSearchResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search([FromQuery] FlightSearchRequestDto request)
     {
         var result = await _flightService.SearchFlightsAsync(request);

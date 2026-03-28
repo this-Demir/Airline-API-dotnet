@@ -76,6 +76,33 @@ public class FlightEndpointsTests : IntegrationTestBase
         doc.RootElement.GetProperty("returnFlights").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
+    [Fact]
+    public async Task Search_NoQueryParams_Returns200UsingDefaults()
+    {
+        // Arrange — seed a flight 10 days from now (inside the default 6-month window)
+        await SeedFlightAsync("DF01", "DF02", "DFLT01",
+            DateTime.UtcNow.AddDays(10));
+
+        // Act — call with absolutely no query parameters
+        var response = await _client.GetAsync("/api/v1/flights/search");
+
+        // Assert — defaults kick in: today → today+6months, all origins/destinations, 1 passenger
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        doc.RootElement.GetProperty("outbound").GetProperty("totalCount").GetInt32()
+            .Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task Search_InvalidDateFormat_Returns400()
+    {
+        // Act — DepartureFrom value is not yyyy-MM-dd
+        var response = await _client.GetAsync("/api/v1/flights/search?DepartureFrom=not-a-date");
+
+        // Assert — ArgumentException thrown in service → ExceptionHandlingMiddleware → 400
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ── Auth guards — Admin-only endpoints ───────────────────────────────────
 
     [Fact]

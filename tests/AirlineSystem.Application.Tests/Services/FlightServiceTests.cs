@@ -116,8 +116,8 @@ public class FlightServiceTests
         {
             OriginCode = "IST",
             DestinationCode = "ADB",
-            DepartureFrom = DateTime.UtcNow,
-            DepartureTo = DateTime.UtcNow.AddDays(30),
+            DepartureFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            DepartureTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
             NumberOfPeople = 2,
             PageNumber = 1
         };
@@ -168,8 +168,8 @@ public class FlightServiceTests
         {
             OriginCode = "IST",
             DestinationCode = "ADB",
-            DepartureFrom = DateTime.UtcNow,
-            DepartureTo = DateTime.UtcNow.AddDays(30),
+            DepartureFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            DepartureTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
             NumberOfPeople = 2,
             PageNumber = 1,
             IsRoundTrip = true

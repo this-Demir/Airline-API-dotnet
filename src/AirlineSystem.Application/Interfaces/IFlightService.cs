@@ -10,15 +10,24 @@ public interface IFlightService
 {
     /// <summary>
     /// Searches for available flights matching a route, date range, and seat requirement.
+    /// All parameters are optional; sensible defaults are applied when omitted.
     /// </summary>
     /// <param name="request">
-    /// Search parameters: origin/destination IATA codes, date range, number of passengers,
-    /// round-trip flag, and 1-based page number.
+    /// Search parameters bound from the query string. Date fields (<c>DepartureFrom</c>,
+    /// <c>DepartureTo</c>) must use <c>yyyy-MM-dd</c> format when supplied. Omitting them
+    /// defaults the window to <em>today → today + 6 months</em> (UTC). Omitting
+    /// <c>OriginCode</c> or <c>DestinationCode</c> disables that filter. <c>NumberOfPeople</c>
+    /// defaults to 1; <c>IsRoundTrip</c> defaults to <c>false</c>.
     /// </param>
     /// <returns>
     /// A paginated result (page size fixed at 10) containing only flights with
-    /// <c>AvailableCapacity &gt;= NumberOfPeople</c>.
+    /// <c>AvailableCapacity &gt;= NumberOfPeople</c> (FR-04.03).
+    /// When <c>IsRoundTrip</c> is <c>true</c>, <c>ReturnFlights</c> is also populated.
     /// </returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when a supplied date string does not conform to <c>yyyy-MM-dd</c>.
+    /// Mapped to HTTP 400 by <c>ExceptionHandlingMiddleware</c>.
+    /// </exception>
     Task<FlightSearchResponseDto> SearchFlightsAsync(FlightSearchRequestDto request);
 
     /// <summary>
