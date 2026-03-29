@@ -22,7 +22,7 @@
 
 ## Executive Summary
 
-The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 77 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds, generating over 11,700 HTTP requests and reaching approximately 150 requests per second at peak. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
+The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 81 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds, generating over 11,700 HTTP requests and reaching approximately 150 requests per second at peak. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
 
 ---
 
@@ -33,8 +33,8 @@ The QA process covers three complementary test layers: Application-layer unit te
 | Test Project | Framework | Database | Tests |
 |---|---|---|---|
 | `AirlineSystem.Application.Tests` | xUnit + Moq + FluentAssertions | None (all mocked) | 25 |
-| `AirlineSystem.API.IntegrationTests` | xUnit + WebApplicationFactory | EF Core InMemory | 52 |
-| **Total** | | | **77** |
+| `AirlineSystem.API.IntegrationTests` | xUnit + WebApplicationFactory | EF Core InMemory | 56 |
+| **Total** | | | **81** |
 
 ### 1.2 CI/CD Pipeline
 
@@ -134,7 +134,7 @@ No MySQL service containers, no secrets, and no network access are needed. The i
 
 ---
 
-#### Airport Endpoints — `/api/v1/airports` CRUD (12 tests)
+#### Airport Endpoints — `/api/v1/airports` CRUD + Batch (14 tests)
 
 | Test | Expected |
 |---|---|
@@ -150,16 +150,20 @@ No MySQL service containers, no secrets, and no network access are needed. The i
 | `Update_AdminToken_UnknownId_Returns404` | 404 |
 | `Delete_AdminToken_ExistingId_Returns204` | 204 |
 | `Delete_AdminToken_UnknownId_Returns404` | 404 |
+| `CreateBatch_AdminToken_ValidList_Returns200WithCreatedAirports` | 200 — `airports` array contains inserted records; `skippedCodes` is empty |
+| `CreateBatch_AdminToken_DuplicateCode_Returns200WithSkippedCodes` | 200 — duplicate codes reported in `skippedCodes`; no error thrown |
 
 ---
 
-#### Flight Endpoints — `/api/v1/flights` (22 tests)
+#### Flight Endpoints — `/api/v1/flights` (24 tests)
 
-**Public search (6 tests)**
+**Public search (8 tests)**
 
 | Test | Expected |
 |---|---|
 | `Search_PublicEndpoint_Returns200WithEmptyOutbound` | 200 — no auth required; `totalCount = 0`, `returnFlights = null` |
+| `Search_NoQueryParams_Returns200UsingDefaults` | 200 — omitting all query params uses server defaults without error |
+| `Search_InvalidDateFormat_Returns400` | 400 — non-parseable date string rejected before hitting service layer |
 | `Search_SeededFlight_EmptyCodes_ReturnsResults` | 200 — at least 1 result when no code filters applied |
 | `Search_SeededFlight_OriginDestCodes_FiltersCorrectly` | 200 — at least 1 result with exact origin/destination match |
 | `Search_SeededFlight_WrongCodes_ReturnsEmpty` | 200 — `totalCount = 0` for non-existent airport codes |
@@ -440,7 +444,7 @@ The API handled high read traffic well: the composite index on `(FlightNumber, D
 
 ## 8. How to Reproduce
 
-### Automated Tests (77 tests, ~41 seconds)
+### Automated Tests (81 tests, ~41 seconds)
 
 ```bash
 # Run all tests (unit + integration)

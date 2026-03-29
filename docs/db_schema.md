@@ -37,7 +37,8 @@ erDiagram
         datetime ArrivalDate "date-to"
         int DurationMinutes "duration"
         int TotalCapacity "capacity"
-        int AvailableCapacity 
+        int AvailableCapacity
+        timestamp RowVersion "optimistic concurrency token"
         uniqueidentifier OriginAirportId FK
         uniqueidentifier DestinationAirportId FK
     }
@@ -89,6 +90,7 @@ The schema is designed up to the **Third Normal Form (3NF)** to ensure data inte
     * `OriginAirportId` / `DestinationAirportId` (Guid, FK): Links to Airport table.
     * `TotalCapacity` (Int): Initial limit.
     * `AvailableCapacity` (Int): Decrements upon successful purchases; triggers "Sold Out" logic when 0.
+    * `RowVersion` (Timestamp): EF Core optimistic concurrency token — prevents overselling under concurrent purchases.
 
 ### 2.4 Booking (Ticket) Table
 * **Purpose:** Represents the atomic transaction of a purchase. Groups multiple passengers under a single PNR.

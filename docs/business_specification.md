@@ -53,8 +53,8 @@
 
 | **Step** | **Action** | **System Component** | **Required Data** | **Estimated API Endpoint** |
 | --- | --- | --- | --- | --- |
-| 1 | User provides Flight, Date, and Passenger Name for check-in. | Check-in Service | `FlightNo`, `Date`, `Name` | `POST /api/v1/checkin` |
-| 2 | System verifies the passenger exists for that flight/date. | Database | `TicketId`, `PassengerName` | `POST /api/v1/checkin` |
+| 1 | User provides PNR code and Passenger Name for check-in. | Check-in Service | `PnrCode`, `PassengerName` | `POST /api/v1/checkin` |
+| 2 | System looks up the booking by PNR and verifies the passenger name matches. | Database | `PnrCode`, `PassengerName` | `POST /api/v1/checkin` |
 | 3 | System assigns next available sequential seat number (1, 2, 3...). | Seat Allocator | `FlightId`, `LastAssignedSeat` | `POST /api/v1/checkin` |
 | 4 | System persists seat assignment and returns full passenger/seat list. | Database | `SeatNo`, `PassengerId` | `POST /api/v1/checkin` |
 
