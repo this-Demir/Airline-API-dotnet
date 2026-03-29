@@ -26,7 +26,7 @@ for (var i = 0; i < routeCount; i++)
     builder.Configuration[$"Routes:{i}:DownstreamScheme"] = apiScheme;
 }
 builder.Configuration["SwaggerEndPoints:0:Config:0:Url"] =
-    $"{apiScheme}://{apiHost}/swagger/v1/swagger.json";
+    $"{apiScheme}://{apiHost}:{apiPort}/swagger/v1/swagger.json";
 
 builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();

@@ -45,7 +45,7 @@
         {
           "Name": "Airline Ticketing API",
           "Version": "v1",
-          "Url": "http://backend-api/swagger/v1/swagger.json"
+          "Url": "http://backend-api:8080/swagger/v1/swagger.json"
         }
       ]
     }
