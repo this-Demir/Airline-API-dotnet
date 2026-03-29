@@ -4,7 +4,14 @@
       "UpstreamPathTemplate": "/api/v1/flights/search",
       "DownstreamHostAndPorts": [
         { "Host": "localhost", "Port": 5203 }
-      ]
+      ],
+      "RateLimitOptions": {
+        "ClientWhitelist": [],
+        "EnableRateLimiting": true,
+        "Period": "1d",
+        "PeriodTimespan": 86400,
+        "Limit": 1000
+      }
     },
     {
       "UpstreamPathTemplate": "/api/v1/{everything}",

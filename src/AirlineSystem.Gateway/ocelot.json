@@ -25,7 +25,10 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         { "Host": "backend-api", "Port": 8080 }
-      ]
+      ],
+      "RateLimitOptions": {
+        "EnableRateLimiting": false
+      }
     }
   ],
   "GlobalConfiguration": {
@@ -34,8 +37,7 @@
       "ClientIdHeader": "ClientId",
       "DisableRateLimitHeaders": false,
       "QuotaExceededMessage": "Too many requests. Please try again later.",
-      "HttpStatusCode": 429,
-      "EnableRateLimiting": true
+      "HttpStatusCode": 429
     }
   },
   "SwaggerEndPoints": [

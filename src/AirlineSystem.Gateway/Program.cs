@@ -39,7 +39,9 @@ var app = builder.Build();
 // per-IP quotas without requiring callers to send a ClientId header.
 app.Use(async (context, next) =>
 {
-    var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+        ?? context.Connection.RemoteIpAddress?.ToString()
+        ?? "unknown";
     context.Request.Headers["ClientId"] = clientIp;
     await next();
 });
