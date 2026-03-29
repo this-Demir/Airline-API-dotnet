@@ -1,5 +1,6 @@
 using AirlineSystem.Application.DTOs.Flights;
 using AirlineSystem.Application.DTOs.Tickets;
+using AirlineSystem.Application.Exceptions;
 using AirlineSystem.Application.Interfaces;
 using AirlineSystem.Domain.Entities;
 
@@ -78,13 +79,34 @@ public class TicketService : ITicketService
             });
         }
 
-        flight.AvailableCapacity -= request.PassengerNames.Count;
-        _uow.Flights.Update(flight);
+        await _uow.Bookings.AddAsync(booking);  // staged once; stays Added across retries
 
-        await _uow.Bookings.AddAsync(booking);
-        await _uow.SaveChangesAsync();
+        const int MaxRetries = 3;
+        for (int attempt = 0; attempt < MaxRetries; attempt++)
+        {
+            // attempt 0: capacity already verified above the loop.
+            // attempt 1+: flight was reloaded with fresh AvailableCapacity — recheck.
+            if (attempt > 0 && flight.AvailableCapacity < request.PassengerNames.Count)
+                return new TicketResponseDto { Status = "SoldOut" };
 
-        return new TicketResponseDto { Status = "Confirmed", PnrCode = booking.PnrCode };
+            flight.AvailableCapacity -= request.PassengerNames.Count;
+            _uow.Flights.Update(flight);  // re-marks Modified after each ReloadAsync reset
+
+            try
+            {
+                await _uow.SaveChangesAsync();
+                return new TicketResponseDto { Status = "Confirmed", PnrCode = booking.PnrCode };
+            }
+            catch (ConcurrencyConflictException)
+            {
+                // Refreshes AvailableCapacity and RowVersion in-place from the DB;
+                // resets entity state to Unchanged so the next Update() is clean.
+                await _uow.ReloadEntityAsync(flight);
+            }
+        }
+
+        // S0 → [3 retries all lost to concurrency] → treat as sold out
+        return new TicketResponseDto { Status = "SoldOut" };
     }
 
     /// <inheritdoc/>

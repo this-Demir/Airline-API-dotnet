@@ -1,6 +1,8 @@
+using AirlineSystem.Application.Exceptions;
 using AirlineSystem.Application.Interfaces;
 using AirlineSystem.Domain.Interfaces;
 using AirlineSystem.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace AirlineSystem.Infrastructure.Repositories;
 
@@ -63,12 +65,35 @@ public class UnitOfWork : IUnitOfWork
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Delegates directly to <see cref="Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(System.Threading.CancellationToken)"/>,
+    /// Delegates to <see cref="Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(System.Threading.CancellationToken)"/>,
     /// which flushes all pending <c>Added / Modified / Deleted</c> entity states
     /// to the database within a single implicit transaction.
+    /// <para>
+    /// Any <see cref="DbUpdateConcurrencyException"/> (stale <c>RowVersion</c>) is
+    /// wrapped as a <see cref="ConcurrencyConflictException"/> so callers remain
+    /// free of EF Core dependencies.
+    /// </para>
     /// </remarks>
-    public async Task<int> SaveChangesAsync() =>
-        await _context.SaveChangesAsync();
+    public async Task<int> SaveChangesAsync()
+    {
+        try
+        {
+            return await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException();
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Calls <c>DbContext.Entry(entity).ReloadAsync()</c>, which issues a fresh
+    /// <c>SELECT</c> and overwrites all tracked property values, including the
+    /// <c>RowVersion</c> concurrency token, then resets entity state to <c>Unchanged</c>.
+    /// </remarks>
+    public async Task ReloadEntityAsync<T>(T entity) where T : class =>
+        await _context.Entry(entity).ReloadAsync();
 
     /// <inheritdoc/>
     public void Dispose() => _context.Dispose();

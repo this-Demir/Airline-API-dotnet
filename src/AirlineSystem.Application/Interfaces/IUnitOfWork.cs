@@ -31,5 +31,21 @@ public interface IUnitOfWork : IDisposable
     /// <returns>
     /// The number of state entries written to the database.
     /// </returns>
+    /// <exception cref="Exceptions.ConcurrencyConflictException">
+    /// Thrown when an optimistic concurrency conflict is detected (stale <c>RowVersion</c>).
+    /// Callers should call <see cref="ReloadEntityAsync{T}"/> on the conflicting entity
+    /// and retry.
+    /// </exception>
     Task<int> SaveChangesAsync();
+
+    /// <summary>
+    /// Reloads <paramref name="entity"/> from the database, overwriting all current
+    /// property values (including the <c>RowVersion</c> concurrency token) and
+    /// resetting EF Core entity state to <c>Unchanged</c>.
+    /// Call this after catching a <see cref="Exceptions.ConcurrencyConflictException"/>
+    /// before retrying <see cref="SaveChangesAsync"/>.
+    /// </summary>
+    /// <typeparam name="T">Any EF Core-tracked class.</typeparam>
+    /// <param name="entity">The stale entity to reload in-place.</param>
+    Task ReloadEntityAsync<T>(T entity) where T : class;
 }

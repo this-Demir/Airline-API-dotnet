@@ -1,3 +1,4 @@
+using AirlineSystem.Application.Exceptions;
 using System.Text.Json;
 
 namespace AirlineSystem.API.Middleware;
@@ -20,6 +21,7 @@ namespace AirlineSystem.API.Middleware;
 ///   <item><term><see cref="UnauthorizedAccessException"/></term><description>401 Unauthorized</description></item>
 ///   <item><term><see cref="InvalidOperationException"/></term><description>400 Bad Request</description></item>
 ///   <item><term><see cref="ArgumentException"/></term><description>400 Bad Request</description></item>
+///   <item><term><see cref="AirlineSystem.Application.Exceptions.ConcurrencyConflictException"/></term><description>409 Conflict</description></item>
 ///   <item><term>Any other <see cref="Exception"/></term><description>500 Internal Server Error (generic message; full exception logged)</description></item>
 /// </list>
 /// Register this middleware <b>first</b> in the pipeline so it wraps all
@@ -81,6 +83,11 @@ public class ExceptionHandlingMiddleware
             case InvalidOperationException:
             case ArgumentException:
                 statusCode = StatusCodes.Status400BadRequest;
+                message    = exception.Message;
+                break;
+
+            case ConcurrencyConflictException:
+                statusCode = StatusCodes.Status409Conflict;
                 message    = exception.Message;
                 break;
 
