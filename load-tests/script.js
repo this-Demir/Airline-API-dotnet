@@ -93,7 +93,7 @@ function jsonHeaders(token) {
 function addDays(isoDate, days) {
   const d = new Date(isoDate);
   d.setDate(d.getDate() + days);
-  return d.toISOString();
+  return d.toISOString().split('T')[0]; // yyyy-MM-dd — required by ParseDate strict format
 }
 
 // ── Static data pools ──────────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ function scenarioStaleScan() {
   let qs;
   if (useGhostRoute) {
     const [origin, dest] = randomItem(GHOST_ROUTES);
-    const fromDate = addDays('2026-06-15T00:00:00.000Z', randomInt(0, 10));
+    const fromDate = addDays('2026-06-15', randomInt(0, 10));
     const toDate   = addDays(fromDate, randomInt(3, 7));
     qs = [
       `OriginCode=${origin}`,
@@ -342,7 +342,7 @@ function scenarioStaleScan() {
     // Wide window round-trip: always fires 2 eager-load queries
     const [origin, dest] = randomItem(SEEDED_ROUTES);
     const windowDays = randomInt(30, 90);
-    const fromDate   = '2026-06-15T00:00:00.000Z';
+    const fromDate   = '2026-06-15';
     const toDate     = addDays(fromDate, windowDays);
     const page       = randomInt(8, 15); // beyond result count → hits COUNT(*) but returns []
     qs = [
@@ -469,8 +469,8 @@ function scenarioDeepPagination(data) {
     const qs = [
       `OriginCode=${origin}`,
       `DestinationCode=${dest}`,
-      `DepartureFrom=2026-06-15T00:00:00.000Z`,
-      `DepartureTo=2026-06-20T23:59:59.000Z`,
+      `DepartureFrom=2026-06-15`,
+      `DepartureTo=2026-06-20`,
       `NumberOfPeople=1`,
       `IsRoundTrip=false`,
       `PageNumber=${page}`,

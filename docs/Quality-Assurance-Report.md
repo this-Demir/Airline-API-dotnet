@@ -5,24 +5,24 @@
 | Project | Airline Company API |
 | Architecture | Clean Architecture (4-layer: Domain → Application → Infrastructure → API) |
 | Runtime | .NET 8 |
-| Report Date | 25-03-2026 |
-| Test Suite Version | Commit `23775b1` |
+| Report Date | 29-03-2026 |
+| Test Suite Version | Commit `5d863a6` |
 
 ---
 
 ## Key Findings
 
-- **Performance under load:** The API handled high read traffic well — flight search and pagination queries stayed within the p95 latency target across all scenarios. Concurrent heavy writes struggled: the `purchase: no server error` check rate fell below the 0.90 threshold during peak chaos, and BCrypt-heavy auth registration caused latency spikes that cascaded to other endpoints at 100 VUs.
+- **Performance under load:** The API handled all 7 chaos scenarios cleanly — all 4 thresholds passed, 100% of checks succeeded (33,668/33,668), and p95 latency came in at 168.2ms against a 3,000ms ceiling. After applying a 3-attempt retry loop with entity reload in `TicketService`, the `purchase: no server error` check rate reached 100.00%, up from below the 0.90 failure threshold in the pre-fix run.
 
-- **Observed bottlenecks:** EF Core's RowVersion optimistic concurrency on `Flight.AvailableCapacity` produced unhandled `DbUpdateConcurrencyException` HTTP 500 errors during concurrent ticket purchases (Concurrency Bomb and Inventory Cliff scenarios). BCrypt CPU saturation during Auth Flood (~300ms per VU iteration at cost factor 10) caused thread-pool queuing that degraded response times across the board.
+- **Observed bottlenecks (resolved and ongoing):** EF Core RowVersion optimistic concurrency on `Flight.AvailableCapacity` originally produced unhandled `DbUpdateConcurrencyException` HTTP 500 errors — **resolved** by wrapping `SaveChangesAsync` in Infrastructure and adding a retry loop in `TicketService`. BCrypt CPU saturation during Auth Flood (~300ms per VU iteration at cost factor 10) remains an observed characteristic: at 15 concurrent auth VUs it queues thread-pool work but did not degrade overall thresholds in the final run.
 
-- **Potential scalability improvements:** Implement **Redis caching** on `GET /flights/search` results (TTL 60s) to eliminate repeated full-index scans for identical or ghost-route queries. Replace synchronous `AvailableCapacity` decrements with a **RabbitMQ-backed async purchase queue** to serialize ticket writes without RowVersion contention, converting Concurrency Bomb failures into graceful queued confirmations.
+- **Potential scalability improvements:** Implement **Redis caching** on `GET /flights/search` results (TTL 60s) to eliminate repeated full-index scans for identical or ghost-route queries.
 
 ---
 
 ## Executive Summary
 
-The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 81 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds, generating over 11,700 HTTP requests and reaching approximately 150 requests per second at peak. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
+The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 83 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds, generating 17,264 HTTP requests at approximately 81.6 requests per second. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
 
 ---
 
@@ -32,9 +32,9 @@ The QA process covers three complementary test layers: Application-layer unit te
 
 | Test Project | Framework | Database | Tests |
 |---|---|---|---|
-| `AirlineSystem.Application.Tests` | xUnit + Moq + FluentAssertions | None (all mocked) | 25 |
+| `AirlineSystem.Application.Tests` | xUnit + Moq + FluentAssertions | None (all mocked) | 27 |
 | `AirlineSystem.API.IntegrationTests` | xUnit + WebApplicationFactory | EF Core InMemory | 56 |
-| **Total** | | | **81** |
+| **Total** | | | **83** |
 
 ### 1.2 CI/CD Pipeline
 
@@ -69,7 +69,7 @@ No MySQL service containers, no secrets, and no network access are needed. The i
 
 ---
 
-#### TicketService (9 tests)
+#### TicketService (11 tests)
 
 | Test | Technique |
 |---|---|
@@ -82,6 +82,8 @@ No MySQL service containers, no secrets, and no network access are needed. The i
 | `BuyTicketAsync_Success_PassengerHasExplicitBookingIdAndFlightId` | State verification — intentional denormalization: both `BookingId` and `FlightId` populated |
 | `BuyTicketAsync_Success_AvailableCapacityDecremented` | State verification — `AvailableCapacity` reduced by passenger count; `Update` called once |
 | `BuyTicketAsync_SoldOut_SaveChangesNeverCalled` | Mutation guard — `Times.Never` on `SaveChangesAsync` when sold out |
+| `BuyTicketAsync_ConcurrencyFailOnFirstAttempt_RetriesAndReturnsConfirmed` | Retry — `SetupSequence` throws `ConcurrencyConflictException` once then succeeds; verifies `SaveChangesAsync` called twice, `ReloadEntityAsync` once |
+| `BuyTicketAsync_AllRetriesExhausted_ReturnsSoldOut` | Retry exhaustion — `SaveChangesAsync` always throws; verifies 3 attempts, 3 reloads, `SoldOut` returned |
 
 ---
 
@@ -252,11 +254,11 @@ The observability stack is defined in `docker-compose.yml`:
 docker compose up -d
 ```
 
-### 2.2 Isolated Core Baseline — Rationale for API Gateway Bypass
+### 2.2 Gateway with Rate Limiting Disabled — Rationale
 
-The load test targets the core API directly at `http://localhost:5203`, intentionally bypassing the Ocelot/YARP API Gateway. The gateway enforces a **3 requests/day per-IP rate limit** on `GET /flights/search` (NFR-02.03). If the gateway were included in the test path, the Stale Scan and Deep Pagination scenarios would be rate-throttled after 3 requests, preventing any meaningful stress on the underlying database layer.
+The load test targets the API **through the Ocelot Gateway** at `http://localhost:5000`, but with the `EnableRateLimiting` flag on `GET /flights/search` set to `false` in `ocelot.json`. The gateway's production setting is **3 requests/day per client IP** (NFR-02.03). If that limit were active during the test, the Stale Scan and Deep Pagination scenarios would be throttled after 3 search requests, preventing any meaningful stress on the underlying database layer.
 
-The gateway is a pass-through concern with its own NFR test surface. The purpose of this test is an **Isolated Core Baseline**: measure the pure database and business-logic bottlenecks (index scan performance, EF Core optimistic concurrency, BCrypt CPU cost) before adding gateway concerns. Results from this test directly inform decisions about caching, async queues, and connection-pool sizing in the core service.
+Running through the gateway preserves all middleware transformations (IP header injection, routing), while disabling only the rate limit allows unrestricted search volume. This gives a realistic end-to-end picture of database and business-logic bottlenecks (index scan performance, EF Core optimistic concurrency, BCrypt CPU cost) without the artificial search cap. The rate limit is re-enabled in `ocelot.json` before any production deployment.
 
 ### 2.3 Run Command
 
@@ -265,7 +267,7 @@ The gateway is a pass-through concern with its own NFR test surface. The purpose
 k6 run `
   -e K6_ADMIN_EMAIL=admin@airline.com `
   -e K6_ADMIN_PASSWORD=Password123! `
-  -e BASE_URL=http://localhost:5203 `
+  -e BASE_URL=http://localhost:5000 `
   --tag application=airline-api `
   --out influxdb=http://localhost:8086/k6 `
   load-tests/script.js
@@ -276,7 +278,7 @@ k6 run `
 k6 run \
   -e K6_ADMIN_EMAIL=admin@airline.com \
   -e K6_ADMIN_PASSWORD=Password123! \
-  -e BASE_URL=http://localhost:5203 \
+  -e BASE_URL=http://localhost:5000 \
   --tag application=airline-api \
   --out influxdb=http://localhost:8086/k6 \
   load-tests/script.js
@@ -333,7 +335,7 @@ The `setup()` function in `load-tests/script.js` runs exactly once before any VU
 
 ### Scenario 1: Concurrency Bomb (25%)
 
-At 100 VUs × 25% = 25 concurrent writers, all purchasing from `TK2003` (300-seat flight) simultaneously with 3–6 passengers each. Multiple `SaveChangesAsync` calls read the same `RowVersion` value and race to commit; the losers throw `DbUpdateConcurrencyException`, which the `ExceptionHandlingMiddleware` maps to HTTP 500. The `checks{check:purchase: no server error}: rate>0.90` threshold is the primary bug detector: a rate below 0.90 means unhandled concurrency exceptions are leaking as 500 responses.
+At 100 VUs × 25% = 25 concurrent writers, all purchasing from `TK2003` (300-seat flight) simultaneously with 3–6 passengers each. Multiple `SaveChangesAsync` calls read the same `RowVersion` value and race to commit; the losers throw `DbUpdateConcurrencyException`. The `checks{check:purchase: no server error}: rate>0.90` threshold is the primary concurrency detector. **Fix applied:** `UnitOfWork.SaveChangesAsync` wraps `DbUpdateConcurrencyException` in a clean `ConcurrencyConflictException`; `TicketService.BuyTicketAsync` catches it in a 3-attempt retry loop, calling `ReloadEntityAsync` between attempts to refresh `RowVersion`. Result: `purchase: no server error` check rate reached **100.00%** in the final run.
 
 ### Scenario 2: Stale Scan (15%)
 
@@ -345,7 +347,7 @@ All Thundering Herd VUs hit the identical `thunderboltPnr` acquired in `setup()`
 
 ### Scenario 4: Inventory Cliff (15%)
 
-`TK0001` is seeded with exactly 10 seats. With 15 concurrent Inventory Cliff VUs, the 10 seats are exhausted after roughly 7 iterations. At the cliff, multiple VUs simultaneously read `AvailableCapacity = 1`, all attempt to decrement, and only one can commit. RowVersion losers must receive `SoldOut` or a handled retry — never HTTP 500. This is stricter than Concurrency Bomb: the delta between available capacity (10) and concurrent writers (15) is deliberately tiny to maximise the probability of racing through zero.
+`TK0001` is seeded with exactly 10 seats. With 15 concurrent Inventory Cliff VUs, the 10 seats are exhausted after roughly 7 iterations. At the cliff, multiple VUs simultaneously read `AvailableCapacity = 1`, all attempt to decrement, and only one can commit. This is stricter than Concurrency Bomb: the delta between available capacity (10) and concurrent writers (15) is deliberately tiny to maximise racing through zero. **Fix applied:** same retry loop as Scenario 1; once retries are exhausted or the reloaded capacity is insufficient, `BuyTicketAsync` returns `SoldOut` — no HTTP 500 is ever emitted. Verified in the final run: `purchase: no server error` check rate **100.00%**.
 
 ### Scenario 5: Auth Flood (10%)
 
@@ -378,50 +380,33 @@ Each iteration generates a 25-row CSV (20 unique rows + 5 intentional within-pay
 
 | Metric | Value |
 |---|---|
-| Total HTTP Requests | 11,700+ |
-| Peak Throughput | ~150 requests/second |
+| Total HTTP Requests | 17,264 |
+| Peak Throughput | ~81.6 requests/second |
 | Test Duration | 3 minutes 30 seconds |
 | Maximum Virtual Users | 100 |
-| p95 Response Time | *(screenshot pending)* |
-| Overall Error Rate | *(screenshot pending)* |
-| `purchase: no server error` check rate | *(screenshot pending)* |
-| `auth register: 201` check rate | *(screenshot pending)* |
+| p95 Response Time | 168.2ms |
+| Overall Error Rate | 0.02% |
+| `purchase: no server error` check rate | 100.00% |
+| `auth register: 201` check rate | 100.00% |
+| Total checks passed | 33,668 / 33,668 (100.00%) |
 
 ### 5.2 Grafana Dashboard Screenshots
 
-> **Screenshots to be added.** Place the PNG files in `docs/screenshots/` using the filenames below and they will render automatically.
+**Figure 1 — Grafana Dashboard Overview: VUs, RPS, and Response Time over 3m 30s**
 
-> **How to reproduce:** Start `docker compose up -d`, run the API, execute the k6 command from Section 2.3, then open `http://localhost:3000`. Import Dashboard ID **10660** and select `airline-api` in the **application** dropdown variable. If panels show "No Data", verify `--tag application=airline-api` was passed to k6. If panels show "Invalid interval string" error triangles, edit each affected time-series panel in raw InfluxQL mode and replace `GROUP BY time($__interval)` with `GROUP BY time(${__interval_ms}ms)`.
-
----
-
-**Figure 1 — Dashboard Overview: VUs, RPS, and p95 Response Time over 3m 30s**
-
-*( `docs/screenshots/grafana-overview.png`)*
+![Grafana Dashboard Overview](../load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png)
 
 ---
 
-**Figure 2 — Checks Panel: Per-Scenario Check Pass Rates**
+**Figure 2 — k6 Terminal Summary: All Thresholds and Check Pass Rates**
 
-*( `docs/screenshots/grafana-checks.png`)*
-
----
-
-**Figure 3 — HTTP Duration Histogram: p50 / p90 / p95 / p99**
-
-*( `docs/screenshots/grafana-duration.png`)*
-
----
-
-**Figure 4 — Error Rate Panel: HTTP Failures by Scenario Tag**
-
-*(  `docs/screenshots/grafana-errors.png`)*
+![k6 Terminal Summary](../load_test_results/load_test_gateway_ratelimit_off/k6_terminal_summary.png)
 
 ---
 
 ## 6. Analysis
 
-The API handled high read traffic well: the composite index on `(FlightNumber, DepartureDate)` kept flight search and pagination queries within the p95 target even for ghost-route scans and `COUNT(*)` queries on empty result sets across all 7 Stale Scan and Deep Pagination VUs. Concurrent heavy writes struggled as expected — the `purchase: no server error` check rate fell below 0.90 during peak chaos, exposing unhandled `DbUpdateConcurrencyException` 500 errors caused by EF Core's RowVersion optimistic concurrency on `Flight.AvailableCapacity`; the fix is a retry loop in `TicketService` that catches `DbUpdateConcurrencyException`, reloads the entity, and retries up to N times before returning a `SoldOut` response. BCrypt CPU saturation during the Auth Flood scenario caused registration latency spikes at peak load because each BCrypt hash is ~150ms of CPU-bound work, and with 15 concurrent auth VUs the thread pool queued requests destined for other endpoints — the recommended mitigation is a dedicated BCrypt worker queue or an API Gateway rate limit on `POST /auth/register`. For future scalability, implementing **Redis caching** on `GET /flights/search` results with a short TTL (e.g., 60 seconds) would collapse the Stale Scan scenario's database pressure entirely, since ghost-route results are deterministically empty and safe to cache. Replacing synchronous `AvailableCapacity` decrements with a **RabbitMQ-backed asynchronous purchase queue** would serialize ticket purchase requests without RowVersion contention, converting the Concurrency Bomb and Inventory Cliff scenarios from hard 500 failures into graceful queued confirmations.
+The API handled all 7 chaos scenarios cleanly in the final run: all 4 thresholds passed, 100% of 33,668 checks succeeded, and p95 latency (168.2ms) was well under the 3,000ms ceiling. The composite index on `(FlightNumber, DepartureDate)` kept flight search and pagination queries within target even for ghost-route scans and `COUNT(*)` queries on empty result sets. The EF Core RowVersion concurrency issue — where multiple concurrent `SaveChangesAsync` calls on the same `Flight` row caused unhandled `DbUpdateConcurrencyException` HTTP 500 errors — was resolved by wrapping the exception at the Infrastructure boundary (`UnitOfWork.SaveChangesAsync`) and adding a 3-attempt retry loop with entity reload (`IUnitOfWork.ReloadEntityAsync`) in `TicketService.BuyTicketAsync`. After all retry attempts are exhausted, the service returns `SoldOut` rather than propagating an exception, so the Concurrency Bomb and Inventory Cliff scenarios no longer generate 500 responses. BCrypt CPU saturation during the Auth Flood scenario (each hash ~150ms at cost factor 10) caused registration latency spikes at peak, but did not breach any threshold in the final run — the recommended mitigation for higher scale is an API Gateway rate limit on `POST /auth/register`. For future scalability, **Redis caching** on `GET /flights/search` results with a short TTL (e.g., 60 seconds) would eliminate Stale Scan database pressure entirely, since ghost-route results are deterministically empty and safe to cache.
 
 ---
 
@@ -438,13 +423,14 @@ The API handled high read traffic well: the composite index on `(FlightNumber, D
 | Metrics store | InfluxDB 1.8 |
 | Dashboard | Grafana — Dashboard ID 10660 |
 | CI runner | GitHub Actions `ubuntu-latest` |
-| API port | 5203 |
+| Load test entry point | Gateway port 5000 (rate limiting disabled for test) |
+| API port | 5203 (direct, no gateway) |
 
 ---
 
 ## 8. How to Reproduce
 
-### Automated Tests (81 tests, ~41 seconds)
+### Automated Tests (83 tests, ~41 seconds)
 
 ```bash
 # Run all tests (unit + integration)

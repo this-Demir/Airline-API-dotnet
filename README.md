@@ -269,8 +269,8 @@ The load test is implemented in `load-tests/script.js` using k6 and targets 7 ch
 | Peak throughput | ~150 requests / second |
 | Test duration | 3 minutes 30 seconds |
 | Maximum virtual users | 100 |
-| p95 response time | *(screenshot pending — see `docs/screenshots/grafana-duration.png`)* |
-| Overall error rate | *(screenshot pending — see `docs/screenshots/grafana-errors.png`)* |
+| p95 response time | see `docs/load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png` |
+| Overall error rate | see `docs/load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png` |
 
 ### Key Findings
 
@@ -278,9 +278,13 @@ The load test is implemented in `load-tests/script.js` using k6 and targets 7 ch
 
 - **Observed bottlenecks:** EF Core's RowVersion optimistic concurrency on `Flight.AvailableCapacity` produced unhandled `DbUpdateConcurrencyException` HTTP 500 errors during concurrent ticket purchases (Concurrency Bomb and Inventory Cliff scenarios). BCrypt CPU saturation during Auth Flood (~300 ms per VU iteration at cost factor 10) caused thread-pool queuing that degraded response times across the board.
 
-- **Potential scalability improvements:** Implement Redis caching on `GET /flights/search` results (TTL 60 s) to eliminate repeated full-index scans for identical or ghost-route queries. Replace synchronous `AvailableCapacity` decrements with a RabbitMQ-backed async purchase queue to serialize ticket writes without RowVersion contention, converting Concurrency Bomb failures into graceful queued confirmations.
+- **Resolved — EF Core concurrency (Concurrency Bomb & Inventory Cliff):** `TicketService.BuyTicketAsync` now wraps `SaveChangesAsync` in a 3-attempt retry loop. On each `DbUpdateConcurrencyException` the stale `Flight` entity is reloaded in-place via `IUnitOfWork.ReloadEntityAsync` (calls `DbContext.Entry(entity).ReloadAsync()`), refreshing `AvailableCapacity` and `RowVersion` before retrying. Retries exhausted → `Status = "SoldOut"`. The exception is also mapped to HTTP 409 in `ExceptionHandlingMiddleware` as a safety net. Both the `purchase: no server error` and `cliff: no server error` k6 checks now pass at 100%.
 
-Grafana dashboard screenshots and the full scenario-by-scenario breakdown are in [docs/Quality-Assurance-Report.md](docs/Quality-Assurance-Report.md).
+- **Potential scalability improvements:** Implement Redis caching on `GET /flights/search` results (TTL 60 s) to eliminate repeated full-index scans for identical or ghost-route queries.
+
+Grafana dashboard and full scenario-by-scenario breakdown: [docs/Quality-Assurance-Report.md](docs/Quality-Assurance-Report.md).
+
+![Grafana load test overview](docs/load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png)
 
 ### Running the Load Test
 

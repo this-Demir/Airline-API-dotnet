@@ -1,4 +1,5 @@
 using AirlineSystem.Application.DTOs.Tickets;
+using AirlineSystem.Application.Exceptions;
 using Xunit;
 using AirlineSystem.Application.Interfaces;
 using AirlineSystem.Application.Services;
@@ -23,6 +24,7 @@ public class TicketServiceTests
         _mockUow.Setup(u => u.Flights).Returns(_mockFlightRepo.Object);
         _mockUow.Setup(u => u.Bookings).Returns(_mockBookingRepo.Object);
         _mockUow.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+        _mockUow.Setup(u => u.ReloadEntityAsync(It.IsAny<Flight>())).Returns(Task.CompletedTask);
         _mockBookingRepo.Setup(r => r.AddAsync(It.IsAny<Booking>())).Returns(Task.CompletedTask);
         _sut = new TicketService(_mockUow.Object);
     }
@@ -180,5 +182,48 @@ public class TicketServiceTests
         await _sut.BuyTicketAsync(MakeRequest(5), UserId);
 
         _mockUow.Verify(u => u.SaveChangesAsync(), Times.Never);
+    }
+
+    // ── Concurrency Retry ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task BuyTicketAsync_ConcurrencyFailOnFirstAttempt_RetriesAndReturnsConfirmed()
+    {
+        // S0 → [retry] → S1 (Confirmed)
+        var flight = MakeFlight(capacity: 10);
+        _mockFlightRepo.Setup(r => r.GetByFlightNumberAndDateAsync("TK100", It.IsAny<DateTime>()))
+            .ReturnsAsync(flight);
+
+        _mockUow.SetupSequence(u => u.SaveChangesAsync())
+            .ThrowsAsync(new ConcurrencyConflictException())
+            .ReturnsAsync(1);
+
+        var result = await _sut.BuyTicketAsync(MakeRequest(2), UserId);
+
+        result.Status.Should().Be("Confirmed");
+        result.PnrCode.Should().NotBeNullOrEmpty().And.HaveLength(6);
+        _mockUow.Verify(u => u.SaveChangesAsync(), Times.Exactly(2));
+        _mockUow.Verify(u => u.ReloadEntityAsync(flight), Times.Once);
+    }
+
+    [Fact]
+    public async Task BuyTicketAsync_AllRetriesExhausted_ReturnsSoldOut()
+    {
+        // S0 → [3 retries] → SoldOut
+        // capacity=100: in-memory decrements (100→98→96→94) never trigger the
+        // capacity guard (attempt > 0 check), so all 3 SaveChangesAsync calls are reached.
+        var flight = MakeFlight(capacity: 100);
+        _mockFlightRepo.Setup(r => r.GetByFlightNumberAndDateAsync("TK100", It.IsAny<DateTime>()))
+            .ReturnsAsync(flight);
+
+        _mockUow.Setup(u => u.SaveChangesAsync())
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var result = await _sut.BuyTicketAsync(MakeRequest(2), UserId);
+
+        result.Status.Should().Be("SoldOut");
+        result.PnrCode.Should().BeNull();
+        _mockUow.Verify(u => u.SaveChangesAsync(), Times.Exactly(3));
+        _mockUow.Verify(u => u.ReloadEntityAsync(flight), Times.Exactly(3));
     }
 }
