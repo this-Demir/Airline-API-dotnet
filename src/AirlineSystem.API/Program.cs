@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ── EF Core + MySQL ──────────────────────────────────────────────────────────
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 builder.Services.AddDbContext<AirlineDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0))));
 
 // ── Infrastructure implementations ──────────────────────────────────────────
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
