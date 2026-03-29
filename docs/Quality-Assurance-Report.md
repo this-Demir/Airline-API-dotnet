@@ -384,6 +384,7 @@ Each iteration generates a 25-row CSV (20 unique rows + 5 intentional within-pay
 | Peak Throughput | ~81.6 requests/second |
 | Test Duration | 3 minutes 30 seconds |
 | Maximum Virtual Users | 100 |
+| Average Response Time | 35.45ms |
 | p95 Response Time | 168.2ms |
 | Overall Error Rate | 0.02% |
 | `purchase: no server error` check rate | 100.00% |
@@ -394,13 +395,13 @@ Each iteration generates a 25-row CSV (20 unique rows + 5 intentional within-pay
 
 **Figure 1 — Grafana Dashboard Overview: VUs, RPS, and Response Time over 3m 30s**
 
-![Grafana Dashboard Overview](../load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png)
+![Grafana Dashboard Overview](./load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png)
 
 ---
 
 **Figure 2 — k6 Terminal Summary: All Thresholds and Check Pass Rates**
 
-![k6 Terminal Summary](../load_test_results/load_test_gateway_ratelimit_off/k6_terminal_summary.png)
+![k6 Terminal Summary](./load_test_results/load_test_gateway_ratelimit_off/k6_terminal_summary.png)
 
 ---
 

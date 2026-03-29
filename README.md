@@ -265,12 +265,15 @@ The load test is implemented in `load-tests/script.js` using k6 and targets 7 ch
 
 | Metric | Value |
 |---|---|
-| Total HTTP requests | 11,700+ |
-| Peak throughput | ~150 requests / second |
+| Total HTTP requests | 17,264 |
+| Peak throughput | ~81.6 requests / second |
 | Test duration | 3 minutes 30 seconds |
 | Maximum virtual users | 100 |
-| p95 response time | see `docs/load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png` |
-| Overall error rate | see `docs/load_test_results/load_test_gateway_ratelimit_off/grafana_overview.png` |
+| Average response time | 35.45ms |
+| p95 response time | 168.2ms |
+| Overall error rate | 0.02% |
+| `purchase: no server error` check rate | 100.00% |
+| `auth register: 201` check rate | 100.00% |
 
 ### Key Findings
 
