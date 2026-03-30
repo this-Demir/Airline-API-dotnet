@@ -3,8 +3,8 @@
  * ──────────────────────────────────────────────────────────────────────────────
  * Run:
  *   k6 run \
- *     -e K6_ADMIN_EMAIL=admin@airline.com \
- *     -e K6_ADMIN_PASSWORD=Password123! \
+ *     -e K6_ADMIN_EMAIL=YOUR_ADMIN_EMAIL \
+ *     -e K6_ADMIN_PASSWORD=YOUR_ADMIN_PASSWORD \
  *     -e BASE_URL=http://localhost:5000 \
  *     --tag application=airline-api \
  *     --out influxdb=http://localhost:8086/k6 \
