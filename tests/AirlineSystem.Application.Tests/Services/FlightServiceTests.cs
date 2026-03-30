@@ -114,10 +114,10 @@ public class FlightServiceTests
 
         var request = new FlightSearchRequestDto
         {
-            OriginCode = "IST",
-            DestinationCode = "ADB",
-            DepartureFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-            DepartureTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
+            AirportFrom = "IST",
+            AirportTo = "ADB",
+            DateFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            DateTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
             NumberOfPeople = 2,
             PageNumber = 1
         };
@@ -166,10 +166,10 @@ public class FlightServiceTests
 
         var request = new FlightSearchRequestDto
         {
-            OriginCode = "IST",
-            DestinationCode = "ADB",
-            DepartureFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-            DepartureTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
+            AirportFrom = "IST",
+            AirportTo = "ADB",
+            DateFrom = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            DateTo = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"),
             NumberOfPeople = 2,
             PageNumber = 1,
             IsRoundTrip = true

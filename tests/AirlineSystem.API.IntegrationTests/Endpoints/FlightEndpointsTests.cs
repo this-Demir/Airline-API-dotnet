@@ -63,8 +63,8 @@ public class FlightEndpointsTests : IntegrationTestBase
     {
         // Act — no auth token, no flights seeded in the in-memory DB
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?OriginCode=IST&DestinationCode=ADB" +
-            "&DepartureFrom=2025-06-01&DepartureTo=2025-06-30&NumberOfPeople=1");
+            "/api/v1/flights/search?AirportFrom=IST&AirportTo=ADB" +
+            "&DateFrom=2025-06-01&DateTo=2025-06-30&NumberOfPeople=1");
 
         // Assert — response shape is now { outbound: { items, totalCount, ... }, returnFlights: null }
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -96,8 +96,8 @@ public class FlightEndpointsTests : IntegrationTestBase
     [Fact]
     public async Task Search_InvalidDateFormat_Returns400()
     {
-        // Act — DepartureFrom value is not yyyy-MM-dd
-        var response = await _client.GetAsync("/api/v1/flights/search?DepartureFrom=not-a-date");
+        // Act — DateFrom value is not yyyy-MM-dd
+        var response = await _client.GetAsync("/api/v1/flights/search?DateFrom=not-a-date");
 
         // Assert — ArgumentException thrown in service → ExceptionHandlingMiddleware → 400
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -171,7 +171,7 @@ public class FlightEndpointsTests : IntegrationTestBase
 
         // Act
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?DepartureFrom=2099-11-01&DepartureTo=2099-11-30&NumberOfPeople=1");
+            "/api/v1/flights/search?DateFrom=2099-11-01&DateTo=2099-11-30&NumberOfPeople=1");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -187,10 +187,10 @@ public class FlightEndpointsTests : IntegrationTestBase
         await SeedFlightAsync("SR02", "DS02", "SRCH02",
             new DateTime(2099, 11, 2, 10, 0, 0, DateTimeKind.Utc));
 
-        // Act — filter by exact origin/destination codes
+        // Act — filter by exact departure/arrival airport codes
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?OriginCode=SR02&DestinationCode=DS02" +
-            "&DepartureFrom=2099-11-01&DepartureTo=2099-11-30&NumberOfPeople=1");
+            "/api/v1/flights/search?AirportFrom=SR02&AirportTo=DS02" +
+            "&DateFrom=2099-11-01&DateTo=2099-11-30&NumberOfPeople=1");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -206,10 +206,10 @@ public class FlightEndpointsTests : IntegrationTestBase
         await SeedFlightAsync("SR03", "DS03", "SRCH03",
             new DateTime(2099, 11, 3, 10, 0, 0, DateTimeKind.Utc));
 
-        // Act — filter by non-existent codes
+        // Act — filter by non-existent airport codes
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?OriginCode=XXX&DestinationCode=YYY" +
-            "&DepartureFrom=2099-11-01&DepartureTo=2099-11-30&NumberOfPeople=1");
+            "/api/v1/flights/search?AirportFrom=XXX&AirportTo=YYY" +
+            "&DateFrom=2099-11-01&DateTo=2099-11-30&NumberOfPeople=1");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -228,8 +228,8 @@ public class FlightEndpointsTests : IntegrationTestBase
 
         // Act
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?IsRoundTrip=true&OriginCode=SR04&DestinationCode=DS04" +
-            "&DepartureFrom=2099-11-01&DepartureTo=2099-11-30&NumberOfPeople=1");
+            "/api/v1/flights/search?IsRoundTrip=true&AirportFrom=SR04&AirportTo=DS04" +
+            "&DateFrom=2099-11-01&DateTo=2099-11-30&NumberOfPeople=1");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -249,8 +249,8 @@ public class FlightEndpointsTests : IntegrationTestBase
 
         // Act — request 5 seats
         var response = await _client.GetAsync(
-            "/api/v1/flights/search?OriginCode=SR05&DestinationCode=DS05" +
-            "&DepartureFrom=2099-11-01&DepartureTo=2099-11-30&NumberOfPeople=5");
+            "/api/v1/flights/search?AirportFrom=SR05&AirportTo=DS05" +
+            "&DateFrom=2099-11-01&DateTo=2099-11-30&NumberOfPeople=5");
 
         // Assert — flight excluded because availableCapacity (1) < numberOfPeople (5)
         response.StatusCode.Should().Be(HttpStatusCode.OK);

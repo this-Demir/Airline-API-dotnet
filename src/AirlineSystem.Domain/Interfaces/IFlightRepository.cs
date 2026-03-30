@@ -37,10 +37,10 @@ public interface IFlightRepository : IGenericRepository<Flight>
     /// The implementation must eagerly load <c>OriginAirport</c> and <c>DestinationAirport</c>
     /// navigation properties so that airport codes are available to the service layer.
     /// </remarks>
-    /// <param name="originCode">IATA code of the departure airport.</param>
-    /// <param name="destinationCode">IATA code of the arrival airport.</param>
-    /// <param name="departureFrom">Earliest acceptable departure date/time (UTC, inclusive).</param>
-    /// <param name="departureTo">Latest acceptable departure date/time (UTC, inclusive).</param>
+    /// <param name="airportFrom">IATA code of the departure airport (e.g. <c>"IST"</c>).</param>
+    /// <param name="airportTo">IATA code of the arrival airport (e.g. <c>"JFK"</c>).</param>
+    /// <param name="dateFrom">Earliest acceptable departure date/time (UTC, inclusive).</param>
+    /// <param name="dateTo">Latest acceptable departure date/time (UTC, inclusive).</param>
     /// <param name="numberOfSeats">Minimum seats required; flights with fewer available seats are excluded.</param>
     /// <param name="pageNumber">1-based page number for the paginated result set.</param>
     /// <returns>
@@ -48,10 +48,10 @@ public interface IFlightRepository : IGenericRepository<Flight>
     /// (before pagination), used to compute <c>TotalPages</c>.
     /// </returns>
     Task<(IEnumerable<Flight> Items, int TotalCount)> SearchFlightsAsync(
-        string? originCode,
-        string? destinationCode,
-        DateTime departureFrom,
-        DateTime departureTo,
+        string? airportFrom,
+        string? airportTo,
+        DateTime dateFrom,
+        DateTime dateTo,
         int numberOfSeats,
         int pageNumber);
 

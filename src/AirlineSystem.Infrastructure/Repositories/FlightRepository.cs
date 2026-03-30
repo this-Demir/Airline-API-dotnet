@@ -56,10 +56,10 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
     /// </list>
     /// </remarks>
     public async Task<(IEnumerable<Flight> Items, int TotalCount)> SearchFlightsAsync(
-        string? originCode,
-        string? destinationCode,
-        DateTime departureFrom,
-        DateTime departureTo,
+        string? airportFrom,
+        string? airportTo,
+        DateTime dateFrom,
+        DateTime dateTo,
         int numberOfSeats,
         int pageNumber)
     {
@@ -68,15 +68,15 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
         var query = _context.Flights
             .Include(f => f.OriginAirport)
             .Include(f => f.DestinationAirport)
-            .Where(f => f.DepartureDate >= departureFrom
-                     && f.DepartureDate <= departureTo
+            .Where(f => f.DepartureDate >= dateFrom
+                     && f.DepartureDate <= dateTo
                      && f.AvailableCapacity >= numberOfSeats);
 
-        if (!string.IsNullOrWhiteSpace(originCode))
-            query = query.Where(f => f.OriginAirport.Code.ToUpper() == originCode.ToUpper());
+        if (!string.IsNullOrWhiteSpace(airportFrom))
+            query = query.Where(f => f.OriginAirport.Code.ToUpper() == airportFrom.ToUpper());
 
-        if (!string.IsNullOrWhiteSpace(destinationCode))
-            query = query.Where(f => f.DestinationAirport.Code.ToUpper() == destinationCode.ToUpper());
+        if (!string.IsNullOrWhiteSpace(airportTo))
+            query = query.Where(f => f.DestinationAirport.Code.ToUpper() == airportTo.ToUpper());
 
         var totalCount = await query.CountAsync();
 

@@ -35,16 +35,16 @@ public class FlightsController : ControllerBase
     /// string the endpoint automatically applies the following defaults:
     /// <list type="table">
     ///   <listheader><term>Parameter</term><description>Default</description></listheader>
-    ///   <item><term><c>DepartureFrom</c></term><description>Today's UTC date</description></item>
-    ///   <item><term><c>DepartureTo</c></term><description>6 months from today (UTC)</description></item>
-    ///   <item><term><c>OriginCode</c></term><description>All origins (no filter)</description></item>
-    ///   <item><term><c>DestinationCode</c></term><description>All destinations (no filter)</description></item>
+    ///   <item><term><c>DateFrom</c></term><description>Today's UTC date</description></item>
+    ///   <item><term><c>DateTo</c></term><description>6 months from today (UTC)</description></item>
+    ///   <item><term><c>AirportFrom</c></term><description>All departure airports (no filter)</description></item>
+    ///   <item><term><c>AirportTo</c></term><description>All arrival airports (no filter)</description></item>
     ///   <item><term><c>NumberOfPeople</c></term><description>1</description></item>
     ///   <item><term><c>IsRoundTrip</c></term><description>false</description></item>
     ///   <item><term><c>PageNumber</c></term><description>1</description></item>
     /// </list>
-    /// <b>Date format:</b> <c>DepartureFrom</c> and <c>DepartureTo</c> must be supplied in
-    /// <c>yyyy-MM-dd</c> format (e.g., <c>2025-06-01</c>). Any other format returns 400.<br/>
+    /// <b>Date format:</b> <c>DateFrom</c> and <c>DateTo</c> must be supplied in
+    /// <c>yyyy-MM-dd</c> format (e.g., <c>2026-06-01</c>). Any other format returns 400.<br/>
     /// Flights where <c>AvailableCapacity &lt; NumberOfPeople</c> are excluded
     /// from results (FR-04.03). Rate limiting (max 3 calls/day per IP) is enforced
     /// at the API Gateway level (NFR-02.03) and is not implemented in this controller.

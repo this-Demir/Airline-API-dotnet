@@ -13,10 +13,10 @@ public interface IFlightService
     /// All parameters are optional; sensible defaults are applied when omitted.
     /// </summary>
     /// <param name="request">
-    /// Search parameters bound from the query string. Date fields (<c>DepartureFrom</c>,
-    /// <c>DepartureTo</c>) must use <c>yyyy-MM-dd</c> format when supplied. Omitting them
+    /// Search parameters bound from the query string. Date fields (<c>DateFrom</c>,
+    /// <c>DateTo</c>) must use <c>yyyy-MM-dd</c> format when supplied. Omitting them
     /// defaults the window to <em>today → today + 6 months</em> (UTC). Omitting
-    /// <c>OriginCode</c> or <c>DestinationCode</c> disables that filter. <c>NumberOfPeople</c>
+    /// <c>AirportFrom</c> or <c>AirportTo</c> disables that filter. <c>NumberOfPeople</c>
     /// defaults to 1; <c>IsRoundTrip</c> defaults to <c>false</c>.
     /// </param>
     /// <returns>
