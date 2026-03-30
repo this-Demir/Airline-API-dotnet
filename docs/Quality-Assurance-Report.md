@@ -5,14 +5,14 @@
 | Project | Airline Company API |
 | Architecture | Clean Architecture (4-layer: Domain → Application → Infrastructure → API) |
 | Runtime | .NET 8 |
-| Report Date | 29-03-2026 |
+| Report Date | 30-03-2026 |
 | Test Suite Version | Commit `5d863a6` |
 
 ---
 
 ## Key Findings
 
-- **Performance under load:** The API handled all 7 chaos scenarios cleanly — all 4 thresholds passed, 100% of checks succeeded (33,668/33,668), and p95 latency came in at 168.2ms against a 3,000ms ceiling. After applying a 3-attempt retry loop with entity reload in `TicketService`, the `purchase: no server error` check rate reached 100.00%, up from below the 0.90 failure threshold in the pre-fix run.
+- **Performance under load:** The API handled all 7 chaos scenarios across three load tiers (Normal 20 VUs, Peak 50 VUs, Stress 100 VUs) — all 4 thresholds passed, 100% of checks succeeded (53,311/53,311), and p95 latency came in at 290.17ms against a 3,000ms ceiling. After applying a 3-attempt retry loop with entity reload in `TicketService`, the `purchase: no server error` check rate reached 100.00%, up from below the 0.90 failure threshold in the pre-fix run.
 
 - **Observed bottlenecks (resolved and ongoing):** EF Core RowVersion optimistic concurrency on `Flight.AvailableCapacity` originally produced unhandled `DbUpdateConcurrencyException` HTTP 500 errors — **resolved** by wrapping `SaveChangesAsync` in Infrastructure and adding a retry loop in `TicketService`. BCrypt CPU saturation during Auth Flood (~300ms per VU iteration at cost factor 10) remains an observed characteristic: at 15 concurrent auth VUs it queues thread-pool work but did not degrade overall thresholds in the final run.
 
@@ -22,7 +22,7 @@
 
 ## Executive Summary
 
-The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 83 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds, generating 17,264 HTTP requests at approximately 81.6 requests per second. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
+The QA process covers three complementary test layers: Application-layer unit tests in `AirlineSystem.Application.Tests` (xUnit + Moq + FluentAssertions), full HTTP-pipeline integration tests in `AirlineSystem.API.IntegrationTests` (WebApplicationFactory + EF Core InMemory), and a chaos load test suite in `load-tests/script.js` (k6 + InfluxDB 1.8 + Grafana). All 83 automated tests execute in approximately 41 seconds through a GitHub Actions CI/CD pipeline on every push and pull request to `main`, with no MySQL service container or credentials required. The load test applies 7 intentional chaos scenarios across three explicit load tiers — Normal Load (20 VUs), Peak Load (50 VUs), and Stress Load (100 VUs) — over 5 minutes 30 seconds, generating HTTP requests at approximately 81+ requests per second at peak. The combined suite validates correctness at the unit, integration, and system-stress levels before any code merges into the main branch.
 
 ---
 
@@ -290,13 +290,17 @@ k6 run \
 
 ### 2.4 Load Profile
 
-| Stage | Duration | VUs | Description |
+| Stage | Duration | VUs | Tier |
 |---|---|---|---|
-| Ramp-up | 0s → 45s | 0 → 50 | Warm-up: VUs gradually introduced |
-| Peak (Chaos Zone) | 45s → 2m 45s | 50 → 100 | Sustained peak: maximum concurrent chaos |
-| Ramp-down | 2m 45s → 3m 30s | 100 → 0 | Graceful teardown |
+| Ramp-up | 0s → 30s | 0 → 20 | — |
+| **Normal Load** | 30s → 1m 15s | **20** | ≥30s sustained |
+| Ramp-up | 1m 15s → 1m 45s | 20 → 50 | — |
+| **Peak Load** | 1m 45s → 2m 30s | **50** | ≥30s sustained |
+| Ramp-up | 2m 30s → 3m 00s | 50 → 100 | — |
+| **Stress Load** (Chaos Zone) | 3m 00s → 5m 00s | **100** | ≥30s sustained |
+| Ramp-down | 5m 00s → 5m 30s | 100 → 0 | — |
 
-**Total duration:** 3 minutes 30 seconds | **Maximum VUs:** 100 | **Think time per VU:** 500–1000 ms
+**Total duration:** 5 minutes 30 seconds | **Maximum VUs:** 100 | **Think time per VU:** 500–1000 ms
 
 ### 2.5 Setup Phase
 
@@ -380,16 +384,16 @@ Each iteration generates a 25-row CSV (20 unique rows + 5 intentional within-pay
 
 | Metric | Value |
 |---|---|
-| Total HTTP Requests | 17,264 |
-| Peak Throughput | ~81.6 requests/second |
-| Test Duration | 3 minutes 30 seconds |
+| Total HTTP Requests | 27,281 |
+| Peak Throughput | ~82.2 requests/second |
+| Test Duration | 5 minutes 30 seconds |
 | Maximum Virtual Users | 100 |
-| Average Response Time | 35.45ms |
-| p95 Response Time | 168.2ms |
-| Overall Error Rate | 0.02% |
+| Average Response Time | 62.56ms |
+| p95 Response Time | 290.17ms |
+| Overall Error Rate | 0.01% |
 | `purchase: no server error` check rate | 100.00% |
 | `auth register: 201` check rate | 100.00% |
-| Total checks passed | 33,668 / 33,668 (100.00%) |
+| Total checks passed | 53,311 / 53,311 (100.00%) |
 
 ### 5.2 Grafana Dashboard Screenshots
 

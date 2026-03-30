@@ -1,4 +1,3 @@
-PS D:\Projects_D\Airline-API-dotnet> k6 run -e K6_ADMIN_EMAIL=YOUR_ADMIN_EMAIL -e K6_ADMIN_PASSWORD=YOUR_ADMIN_PASSWORD -e BASE_URL=http://localhost:5000 --out influxdb=http://localhost:8086/k6 load-tests/script.js
 
          /\      Grafana   /‾‾/  
     /\  /  \     |\  __   /  /   
@@ -11,14 +10,24 @@ PS D:\Projects_D\Airline-API-dotnet> k6 run -e K6_ADMIN_EMAIL=YOUR_ADMIN_EMAIL -
         script: load-tests/script.js
         output: InfluxDBv1 (http://localhost:8086)
 
-     scenarios: (100.00%) 1 scenario, 100 max VUs, 4m0s max duration (incl. graceful stop):
-              * default: Up to 100 looping VUs for 3m30s over 3 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+     scenarios: (100.00%) 1 scenario, 100 max VUs, 6m0s max duration (incl. graceful stop):
+              * default: Up to 100 looping VUs for 5m30s over 7 stages (gracefulRampDown: 30s, gracefulStop: 30s)
 
 INFO[0000] [setup] Admin login OK                        source=console
 INFO[0000] [setup] Airports seeded                       source=console
 INFO[0000] [setup] Flight TK0001: created                source=console
 INFO[0000] [setup] Flight TK2003: created                source=console
-INFO[0000] [setup] Flight TK9999: created                source=console                                                                                                                                               
+INFO[0000] [setup] Flight TK9999: created                source=console
+INFO[0000] [setup] Flight TK3001: created                source=console
+INFO[0000] [setup] Flight TK1001: created                source=console
+INFO[0000] [setup] Flight TK4001: created                source=console
+INFO[0000] [setup] Flight TK5001: created                source=console
+INFO[0000] [setup] Flight TK6001: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Flight TK9999: created                source=console
 INFO[0000] [setup] Flight TK3001: created                source=console
 INFO[0000] [setup] Flight TK1001: created                source=console
 INFO[0000] [setup] Flight TK4001: created                source=console
@@ -28,13 +37,64 @@ INFO[0000] [setup] Flight TK7001: created                source=console
 INFO[0000] [setup] Flight TK8001: created                source=console
 INFO[0000] [setup] Flight TK9001: created                source=console
 INFO[0000] [setup] Flight TK1002: created                source=console
-INFO[0000] [setup] Flight TK2004: created                source=console                                                                                                                                               
-INFO[0000] [setup] Flight TK3002: created                source=console
+INFO[0000] [setup] Flight TK2004: created                source=console
+INFO[0001] [setup] Flight TK3002: created                source=console
+INFO[0001] [setup] Flight TK4002: created                source=console
+INFO[0001] [setup] Flight TK5002: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Flight TK9999: created                source=console
+INFO[0000] [setup] Flight TK3001: created                source=console
+INFO[0000] [setup] Flight TK1001: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Flight TK9999: created                source=console
+INFO[0000] [setup] Flight TK3001: created                source=console
+INFO[0000] [setup] Flight TK1001: created                source=console
+INFO[0000] [setup] Flight TK4001: created                source=console
+INFO[0000] [setup] Flight TK5001: created                source=console
+INFO[0000] [setup] Flight TK6001: created                source=console
+INFO[0000] [setup] Flight TK7001: created                source=console
+INFO[0000] [setup] Flight TK8001: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Flight TK9999: created                source=console
+INFO[0000] [setup] Flight TK3001: created                source=console
+INFO[0000] [setup] Flight TK1001: created                source=console
+INFO[0000] [setup] Flight TK4001: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Admin login OK                        source=console
+INFO[0000] [setup] Airports seeded                       source=console
+INFO[0000] [setup] Flight TK0001: created                source=console
+INFO[0000] [setup] Flight TK2003: created                source=console
+INFO[0000] [setup] Flight TK9999: created                source=console
+INFO[0000] [setup] Flight TK3001: created                source=console
+INFO[0000] [setup] Flight TK1001: created                source=console
+INFO[0000] [setup] Flight TK4001: created                source=console
+INFO[0000] [setup] Flight TK5001: created                source=console
+INFO[0000] [setup] Flight TK6001: created                source=console
+INFO[0000] [setup] Flight TK7001: created                source=console
+INFO[0000] [setup] Flight TK8001: created                source=console
+INFO[0000] [setup] Flight TK9001: created                source=console
+INFO[0000] [setup] Flight TK1002: created                source=console
+INFO[0000] [setup] Flight TK2004: created                source=console
+INFO[0001] [setup] Flight TK3002: created                source=console
 INFO[0001] [setup] Flight TK4002: created                source=console
 INFO[0001] [setup] Flight TK5002: created                source=console
 INFO[0001] [setup] Customer token acquired               source=console
-INFO[0001] [setup] Thunderbolt PNR acquired: 639711      source=console
-INFO[0001] [setup] Complete — flights: 16, thunderboltPnr: 639711  source=console                                                                                                                                     
+INFO[0001] [setup] Thunderbolt PNR acquired: A071DD      source=console
+INFO[0001] [setup] Complete — flights: 16, thunderboltPnr: A071DD  source=console
 
 
   █ THRESHOLDS
@@ -46,50 +106,49 @@ INFO[0001] [setup] Complete — flights: 16, thunderboltPnr: 639711  source=cons
     ✓ 'rate>0.90' rate=100.00%
 
     http_req_duration
-    ✓ 'p(95)<3000' p(95)=168.2ms
+    ✓ 'p(95)<3000' p(95)=290.17ms
 
     http_req_failed
-    ✓ 'rate<0.10' rate=0.02%
+    ✓ 'rate<0.10' rate=0.01%
 
 
   █ TOTAL RESULTS
 
-    checks_total.......: 33668   159.115547/s
-    checks_succeeded...: 100.00% 33668 out of 33668
-    checks_failed......: 0.00%   0 out of 33668
+    checks_total.......: 53311   160.604749/s
+    checks_succeeded...: 100.00% 53311 out of 53311
+    checks_failed......: 0.00%   0 out of 53311
 
+    ✓ search: status 200
     ✓ pagination manifest: 200
+    ✓ auth register: 201
+    ✓ auth login: 200
     ✓ purchase: http 200
     ✓ purchase: no server error
     ✓ purchase: valid status
-    ✓ search: status 200
     ✓ cliff: http 200
     ✓ cliff: no server error
     ✓ cliff: valid status
+    ✓ csv: no server error
+    ✓ csv: 200 or 400
     ✓ checkin: status 200
     ✓ checkin: valid status field
     ✓ pagination search: 200
-    ✓ auth register: 201
-    ✓ auth login: 200
-    ✓ csv: no server error
-    ✓ csv: 200 or 400
 
     HTTP
-    http_req_duration..............: avg=35.45ms  min=514.4µs  med=5.56ms   max=543.29ms p(90)=154.8ms  p(95)=168.2ms
-      { expected_response:true }...: avg=35.46ms  min=514.4µs  med=5.56ms   max=543.29ms p(90)=154.81ms p(95)=168.21ms
-    http_req_failed................: 0.02%  5 out of 17264
-    http_reqs......................: 17264  81.589961/s
+    http_req_duration..............: avg=62.56ms  min=515.4µs  med=9.26ms   max=562.47ms p(90)=269.08ms p(95)=290.17ms
+      { expected_response:true }...: avg=62.57ms  min=515.4µs  med=9.25ms   max=562.47ms p(90)=269.08ms p(95)=290.18ms
+    http_req_failed................: 0.01% 5 out of 27281
+    http_reqs......................: 27281 82.186756/s
 
     EXECUTION
-    iteration_duration.............: avg=790.73ms min=503.05ms med=787.42ms max=1.37s    p(90)=989.87ms p(95)=1.07s
-    iterations.....................: 15656  73.990525/s
-    vus............................: 3      min=0          max=100
-    vus_max........................: 100    min=100        max=100
+    iteration_duration.............: avg=819.44ms min=502.58ms med=794.06ms max=1.85s    p(90)=1.05s    p(95)=1.3s
+    iterations.....................: 24748 74.555839/s
+    vus............................: 3     min=0          max=100
+    vus_max........................: 100   min=100        max=100
 
     NETWORK
-    data_received..................: 9.0 MB 43 kB/s
-    data_sent......................: 11 MB  51 kB/s
+    data_received..................: 14 MB 43 kB/s
+    data_sent......................: 17 MB 51 kB/s
 
-    
-running (3m31.6s), 000/100 VUs, 15656 complete and 0 interrupted iterations
-default ✓ [======================================] 000/100 VUs  3m30s
+running (5m31.9s), 000/100 VUs, 24748 complete and 0 interrupted iterations
+default ✓ [======================================] 000/100 VUs  5m30s

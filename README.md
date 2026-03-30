@@ -230,15 +230,19 @@ Placing `Guid.NewGuid()` inside the `AddDbContext` lambda in `CustomWebApplicati
 
 ## Load Test Results
 
-The load test is implemented in `load-tests/script.js` using k6 and targets 7 chaos scenarios at up to 100 concurrent virtual users over 3 minutes 30 seconds. Metrics are stored in InfluxDB 1.8 and visualised in Grafana (Dashboard ID 10660).
+The load test is implemented in `load-tests/script.js` using k6 and targets 7 chaos scenarios across three explicit load tiers up to 100 concurrent virtual users over 5 minutes 30 seconds. Metrics are stored in InfluxDB 1.8 and visualised in Grafana (Dashboard ID 10660).
 
 ### Load Profile
 
-| Stage | Duration | VUs |
-|---|---|---|
-| Ramp-up | 0 – 45 s | 0 → 50 |
-| Peak (Chaos Zone) | 45 s – 2 m 45 s | 50 → 100 |
-| Ramp-down | 2 m 45 s – 3 m 30 s | 100 → 0 |
+| Stage | Duration | VUs | Tier |
+|---|---|---|---|
+| Ramp-up | 0 – 30 s | 0 → 20 | — |
+| **Normal Load** | 30 s – 1 m 15 s | **20** | ≥ 30 s sustained |
+| Ramp-up | 1 m 15 s – 1 m 45 s | 20 → 50 | — |
+| **Peak Load** | 1 m 45 s – 2 m 30 s | **50** | ≥ 30 s sustained |
+| Ramp-up | 2 m 30 s – 3 m 00 s | 50 → 100 | — |
+| **Stress Load** | 3 m 00 s – 5 m 00 s | **100** | ≥ 30 s sustained (chaos zone) |
+| Ramp-down | 5 m 00 s – 5 m 30 s | 100 → 0 | — |
 
 ### Endpoints Tested
 
@@ -265,19 +269,20 @@ The load test is implemented in `load-tests/script.js` using k6 and targets 7 ch
 
 | Metric | Value |
 |---|---|
-| Total HTTP requests | 17,264 |
-| Peak throughput | ~81.6 requests / second |
-| Test duration | 3 minutes 30 seconds |
+| Total HTTP requests | 27,281 |
+| Peak throughput | ~82.2 requests / second |
+| Test duration | 5 minutes 30 seconds |
 | Maximum virtual users | 100 |
-| Average response time | 35.45ms |
-| p95 response time | 168.2ms |
-| Overall error rate | 0.02% |
+| Average response time | 62.56ms |
+| p95 response time | 290.17ms |
+| Overall error rate | 0.01% |
 | `purchase: no server error` check rate | 100.00% |
 | `auth register: 201` check rate | 100.00% |
+| Total checks passed | 53,311 / 53,311 (100.00%) |
 
 ### Key Findings
 
-- **Performance under load:** The API handled high read traffic well — flight search and pagination queries stayed within the p95 latency target across all scenarios. Concurrent heavy writes struggled: the `purchase: no server error` check rate fell below the 0.90 threshold during peak chaos, and BCrypt-heavy auth registration caused latency spikes that cascaded to other endpoints at 100 VUs.
+- **Performance under load:** The API handled all 7 chaos scenarios cleanly across all three load tiers — all 4 thresholds passed, 53,311/53,311 checks succeeded (100%), and p95 latency came in at 290.17ms against a 3,000ms ceiling.
 
 - **Observed bottlenecks:** EF Core's RowVersion optimistic concurrency on `Flight.AvailableCapacity` produced unhandled `DbUpdateConcurrencyException` HTTP 500 errors during concurrent ticket purchases (Concurrency Bomb and Inventory Cliff scenarios). BCrypt CPU saturation during Auth Flood (~300 ms per VU iteration at cost factor 10) caused thread-pool queuing that degraded response times across the board.
 
@@ -300,11 +305,11 @@ docker compose up -d
 # Start the core API
 dotnet run --project src/AirlineSystem.API
 
-# Run k6 (PowerShell)
+# Run k6 (PowerShell) — targets the Gateway on port 5000 (rate limiting must be disabled in ocelot.json before running)
 k6 run `
   -e K6_ADMIN_EMAIL=YOUR_ADMIN_EMAIL `
   -e K6_ADMIN_PASSWORD=YOUR_ADMIN_PASSWORD `
-  -e BASE_URL=http://localhost:5203 `
+  -e BASE_URL=http://localhost:5000 `
   --tag application=airline-api `
   --out influxdb=http://localhost:8086/k6 `
   load-tests/script.js

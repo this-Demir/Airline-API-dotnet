@@ -5,7 +5,7 @@
  *   k6 run \
  *     -e K6_ADMIN_EMAIL=admin@airline.com \
  *     -e K6_ADMIN_PASSWORD=Password123! \
- *     -e BASE_URL=http://localhost:5203 \
+ *     -e BASE_URL=http://localhost:5000 \
  *     --tag application=airline-api \
  *     --out influxdb=http://localhost:8086/k6 \
  *     load-tests/script.js
@@ -36,10 +36,14 @@
  *   15%  Inventory Cliff       POST /tickets/purchase   — race to AvailableCapacity=0
  *   10%  CSV Bomb              POST /flights/upload      — 25-row multipart payloads
  *
- * ── Load Profile (3m30s total) ───────────────────────────────────────────────
- *   0s   ──▶ 45s  : ramp-up   0 → 50 VUs
- *   45s  ──▶ 2m45s: peak      50 → 100 VUs  (chaos zone)
- *   2m45s──▶ 3m30s: ramp-down 100 → 0 VUs
+ * ── Load Profile (5m30s total) ───────────────────────────────────────────────
+ *   0s    ──▶ 30s  : ramp-up      0 → 20 VUs
+ *   30s   ──▶ 1m15s: Normal Load  20 VUs  (45s sustained)
+ *   1m15s ──▶ 1m45s: ramp-up     20 → 50 VUs
+ *   1m45s ──▶ 2m30s: Peak Load   50 VUs  (45s sustained)
+ *   2m30s ──▶ 3m00s: ramp-up     50 → 100 VUs
+ *   3m00s ──▶ 5m00s: Stress Load 100 VUs  (2m sustained, chaos zone)
+ *   5m00s ──▶ 5m30s: ramp-down   100 → 0 VUs
  */
 
 import http  from 'k6/http';
@@ -50,9 +54,13 @@ const BASE_URL = (__ENV.BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 export const options = {
   stages: [
-    { duration: '45s', target: 50  },  // warm-up ramp
-    { duration: '2m',  target: 100 },  // sustained peak — chaos zone
-    { duration: '45s', target: 0   },  // ramp-down
+    { duration: '30s', target: 20  },  // ramp to Normal Load
+    { duration: '45s', target: 20  },  // Normal Load  — 20 VUs (≥30s)
+    { duration: '30s', target: 50  },  // ramp to Peak Load
+    { duration: '45s', target: 50  },  // Peak Load    — 50 VUs (≥30s)
+    { duration: '30s', target: 100 },  // ramp to Stress Load
+    { duration: '2m',  target: 100 },  // Stress Load  — 100 VUs (chaos zone, ≥30s)
+    { duration: '30s', target: 0   },  // ramp-down
   ],
   thresholds: {
     // Relaxed to account for intentional chaos (concurrency 500s, auth queuing)
