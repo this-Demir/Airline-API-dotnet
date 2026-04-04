@@ -34,7 +34,6 @@ A RESTful backend for an airline ticketing system built with **.NET 8** and stri
 | Resource | URL |
 |---|---|
 | Deployed Swagger UI | http://35.170.75.61:5000/swagger/index.html |
-| Project Presentation | https://drive.google.com/drive/folders/1vXmxyfR73zdoM5kntWTVKEWI2hL_1gU2?usp=sharing|
 | Assumptions Document | [docs/assumptions.md](docs/assumptions.md) |
 | QA & Load Test Report | [docs/Quality-Assurance-Report.md](docs/Quality-Assurance-Report.md) |
 
