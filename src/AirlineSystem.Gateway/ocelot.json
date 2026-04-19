@@ -10,11 +10,7 @@
         { "Host": "backend-api", "Port": 8080 }
       ],
       "RateLimitOptions": {
-        "ClientWhitelist": [],
-        "EnableRateLimiting": true,
-        "Period": "1d",
-        "PeriodTimespan": 86400,
-        "Limit": 3
+        "EnableRateLimiting": false
       }
     },
     {
